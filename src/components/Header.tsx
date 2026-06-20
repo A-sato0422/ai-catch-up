@@ -66,6 +66,7 @@ export default function Header() {
         gap: 20,
         padding: '18px 28px',
         borderBottom: '1px solid var(--hairline)',
+        animation: 'fadeInUp 0.4s ease 0s both',
       }}
     >
       {/* Logo */}
