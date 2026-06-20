@@ -113,15 +113,13 @@ describe('GeminiProvider', () => {
     expect(promptText.split('あ').length - 1).toBeLessThanOrEqual(3000);
   });
 
-  it('Flash 250 件超過時に Flash-Lite モデルを使う', async () => {
+  it('Primary 500 件超過時に Fallback モデルを使う', async () => {
     mockGenerateContent.mockResolvedValue(makeResponse(
       '{"summary_ja":"要約","category":"tips","importance_score":5}'
     ));
 
-    // 内部カウンタを 250 に設定するため 250 件処理
-    // ただしテストでは mockGenerateContent を常に成功させる
-    const privateProvider = provider as unknown as { flashUsedToday: number };
-    privateProvider.flashUsedToday = 250;
+    const privateProvider = provider as unknown as { primaryUsedToday: number };
+    privateProvider.primaryUsedToday = 500;
 
     const mockGetGenerativeModel = vi.fn(() => ({ generateContent: mockGenerateContent }));
     (provider as unknown as { genai: { getGenerativeModel: typeof mockGetGenerativeModel } })
@@ -129,8 +127,28 @@ describe('GeminiProvider', () => {
 
     await provider.enrich(baseArticle);
 
-    const [{ model }] = mockGetGenerativeModel.mock.calls[0] as [{ model: string }][];
-    expect(model).toMatch(/flash-lite/i);
+    const [{ model }] = mockGetGenerativeModel.mock.calls[0] as unknown as [{ model: string }];
+    expect(model).toMatch(/gemma/i);
+  });
+
+  it('Primary が 429 を返したとき Fallback にフォールバックし primaryUsedToday を PRIMARY_RPD にセットする', async () => {
+    const quotaError = Object.assign(new Error('Quota exceeded'), { status: 429 });
+    const primaryMock = { generateContent: vi.fn().mockRejectedValue(quotaError) };
+    const fallbackMock = { generateContent: vi.fn().mockResolvedValue(makeResponse(
+      '{"summary_ja":"Fallbackの要約","category":"update","importance_score":6}'
+    )) };
+    const mockGetModel = vi.fn()
+      .mockReturnValueOnce(primaryMock)
+      .mockReturnValueOnce(fallbackMock);
+    (provider as unknown as { genai: { getGenerativeModel: typeof mockGetModel } })
+      .genai.getGenerativeModel = mockGetModel;
+
+    const result = await provider.enrich(baseArticle);
+
+    expect(result.summaryJa).toBe('Fallbackの要約');
+    expect(result.category).toBe('update');
+    const privateProvider = provider as unknown as { primaryUsedToday: number };
+    expect(privateProvider.primaryUsedToday).toBe(500);
   });
 
   it('Flash 呼び出し間隔が短いとき delay を呼ぶ', async () => {

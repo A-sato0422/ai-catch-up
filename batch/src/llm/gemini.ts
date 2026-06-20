@@ -4,12 +4,12 @@ import type { LLMProvider, RawArticle, Enrichment, Category } from '../types.js'
 import { delay } from '../lib/delay.js';
 
 // モデルは env で上書き可能（SPEC §6.5）
-const FLASH_MODEL = process.env.GEMINI_FLASH_MODEL ?? 'gemini-2.0-flash';
-const FLASH_LITE_MODEL = process.env.GEMINI_FLASH_LITE_MODEL ?? 'gemini-2.0-flash-lite';
+const PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL ?? 'gemini-3.1-flash-lite';
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL ?? 'gemma-4-26b-a4b-it';
 
-const FLASH_RPD = 250;       // Flash の無料枠上限（1日）
-const FLASH_INTERVAL_MS = 6000; // Flash の RPM 制御: 10 RPM = 約 6 秒間隔
-const EXCERPT_MAX = 3000;    // LLM に渡す本文の上限（SPEC §6.1）
+const PRIMARY_RPD = 500;          // Primary モデルの無料枠上限（1日）
+const PRIMARY_INTERVAL_MS = 5000; // RPM 制御: 12 RPM = 5 秒間隔（上限 15 RPM に余裕を持たせる）
+const EXCERPT_MAX = 3000;         // LLM に渡す本文の上限（SPEC §6.1）
 
 function buildPrompt(title: string, excerpt: string): string {
   return `以下の技術記事を分析し、JSONのみで回答してください（前後の説明・コードフェンス不要）。
@@ -25,6 +25,10 @@ function buildPrompt(title: string, excerpt: string): string {
 - tips: 使い方・活用術・ハマりどころ・事例など
 
 重要度の目安: 10=破壊的変更/メジャーリリース, 7-8=重要な新機能, 4-6=通常アップデート/Tips, 1-3=ニッチな小ネタ`;
+}
+
+function isQuotaError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 429;
 }
 
 function parseEnrichment(text: string): Enrichment {
@@ -48,8 +52,8 @@ function parseEnrichment(text: string): Enrichment {
 
 export class GeminiProvider implements LLMProvider {
   private readonly genai: GoogleGenerativeAI;
-  private flashUsedToday = 0;
-  private lastFlashCallMs = 0;
+  private primaryUsedToday = 0;
+  private lastPrimaryCallMs = 0;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -58,26 +62,37 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async enrich(article: RawArticle): Promise<Enrichment> {
-    const useFlashLite = this.flashUsedToday >= FLASH_RPD;
-    const modelName = useFlashLite ? FLASH_LITE_MODEL : FLASH_MODEL;
+    const useFallback = this.primaryUsedToday >= PRIMARY_RPD;
+    const modelName = useFallback ? FALLBACK_MODEL : PRIMARY_MODEL;
 
-    if (!useFlashLite) {
-      // Flash の RPM 制御: 前回呼び出しから FLASH_INTERVAL_MS 未満なら待機
-      const elapsed = Date.now() - this.lastFlashCallMs;
-      if (this.lastFlashCallMs > 0 && elapsed < FLASH_INTERVAL_MS) {
-        await delay(FLASH_INTERVAL_MS - elapsed);
+    if (!useFallback) {
+      // Primary の RPM 制御: 前回呼び出しから PRIMARY_INTERVAL_MS 未満なら待機
+      const elapsed = Date.now() - this.lastPrimaryCallMs;
+      if (this.lastPrimaryCallMs > 0 && elapsed < PRIMARY_INTERVAL_MS) {
+        await delay(PRIMARY_INTERVAL_MS - elapsed);
       }
-      this.lastFlashCallMs = Date.now();
+      this.lastPrimaryCallMs = Date.now();
     }
 
     const excerpt = article.excerpt?.slice(0, EXCERPT_MAX) ?? '';
     const prompt = buildPrompt(article.title, excerpt);
     const model = this.genai.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
 
-    if (!useFlashLite) this.flashUsedToday++;
-
-    return parseEnrichment(text);
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      if (!useFallback) this.primaryUsedToday++;
+      return parseEnrichment(text);
+    } catch (err) {
+      // Primary がクォータ超過（429）したら即座に Fallback へ切り替え
+      if (!useFallback && isQuotaError(err)) {
+        console.log(`[gemini] ${PRIMARY_MODEL} quota exceeded, switching to ${FALLBACK_MODEL}`);
+        this.primaryUsedToday = PRIMARY_RPD;
+        const fallbackModel = this.genai.getGenerativeModel({ model: FALLBACK_MODEL });
+        const fallbackResult = await fallbackModel.generateContent(prompt);
+        return parseEnrichment(fallbackResult.response.text());
+      }
+      throw err;
+    }
   }
 }

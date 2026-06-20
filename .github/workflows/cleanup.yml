@@ -1,0 +1,37 @@
+name: Cleanup Old Articles
+
+on:
+  schedule:
+    # 毎週日曜 08:00 JST = 23:00 UTC（SPEC §8.2）
+    - cron: '0 23 * * 0'
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: '保持日数 (デフォルト 30 日)'
+        required: false
+        default: '30'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: batch/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: batch
+
+      - name: Run cleanup
+        run: npm run cleanup
+        working-directory: batch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RETENTION_DAYS: ${{ github.event.inputs.retention_days || '30' }}
