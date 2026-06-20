@@ -1,0 +1,21 @@
+{
+  "name": "ai-cahtchup-batch",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "collect": "tsx src/collect.ts",
+    "cleanup": "tsx src/cleanup.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.9"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "dotenv": "^17.4.2"
+  }
+}

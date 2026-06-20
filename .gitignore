@@ -15,7 +15,7 @@ dist-ssr
 # 環境変数（シークレット保護・最重要）
 .env
 .env.*
-!.env.example
+.env.example
 
 # Editor directories and files
 .vscode/*

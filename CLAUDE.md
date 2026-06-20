@@ -166,3 +166,4 @@ cd batch && npm run cleanup      # 古い記事削除
 - 着手前に `TASK.md` の現在地（Current State）を確認し、完了したら該当タスクのチェックを更新する。
 - 仕様の解釈に迷ったら `SPEC.md` を正典とする。`SPEC.md` に無い判断が必要になったら、勝手に決めず TASK.md の「未決事項」に書き出して確認を仰ぐ。
 - スコープ外（`SPEC.md` の Non-Goals）には手を出さない。
+- 各フェーズの実装タスクは `.claude/agents/phase-implementer.md` の subagent に委譲すること。
