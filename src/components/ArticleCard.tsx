@@ -56,7 +56,7 @@ function CalendarIcon() {
 export default function ArticleCard({ article, config, index, isOpen, isFav, onToggleOpen, onToggleFav }: Props) {
   const isClaude = article.claude !== false;
   const barColor = isClaude ? '#ff5a2c' : '#2f6df0';
-  const displayText = isOpen ? article.full : (article.short || article.full);
+  const displayText = isOpen ? article.full : article.full;
 
   return (
     <div style={{
@@ -140,9 +140,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
         {/* Title */}
         <div style={{ color: 'var(--title)', fontSize: 15, fontWeight: 700, lineHeight: 1.45 }}>
           {article.titleA}
-          {article.titleB && (
-            <span style={{ fontWeight: 500, color: 'var(--muted)' }}>　／　{article.titleB}</span>
-          )}
         </div>
 
         {/* Description */}
@@ -160,7 +157,10 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
 
         {/* Open article link — shown only when expanded */}
         {config.expand && isOpen && (
-          <button
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               marginTop: 14,
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -171,11 +171,12 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
               color: 'var(--muted2)',
               fontSize: 12, fontWeight: 600,
               cursor: 'pointer',
+              textDecoration: 'none',
             }}
           >
             <ExternalLinkIcon />
             元記事を開く
-          </button>
+          </a>
         )}
 
         {/* Badges */}
@@ -258,7 +259,10 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
 
         {/* External link (update screen) */}
         {config.external && (
-          <button
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 32, height: 32, borderRadius: 8,
@@ -266,11 +270,12 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
               background: 'var(--pill-bg)',
               cursor: 'pointer',
               color: 'var(--muted2)',
+              textDecoration: 'none',
             }}
             aria-label="元記事を開く"
           >
             <ExternalLinkIcon />
-          </button>
+          </a>
         )}
       </div>
     </div>

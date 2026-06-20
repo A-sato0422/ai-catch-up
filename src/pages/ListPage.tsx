@@ -1,35 +1,68 @@
 import { useState } from 'react';
 import type { Screen } from '../types';
-import { DATA, SCREEN_CONFIG, SCREEN_META } from '../data/mockData';
+import { SCREEN_CONFIG, SCREEN_META } from '../data/screenConfig';
+import { useArticles } from '../hooks/useArticles';
+import { supabase } from '../lib/supabase';
 import ArticleCard from '../components/ArticleCard';
 
 interface Props {
   screen: Screen;
 }
 
+// スクリーンごとの空状態メッセージ
+const EMPTY_MESSAGE: Record<Screen, string> = {
+  top5:       '今日の記事はまだありません',
+  update:     'アップデート情報はまだありません',
+  tips:       'Tips 記事はまだありません',
+  tipsGemini: 'Tips 記事はまだありません',
+  fav:        'お気に入りはまだありません ★ をタップして追加しよう',
+};
+
 export default function ListPage({ screen }: Props) {
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
-  const [favStates, setFavStates] = useState<Record<string, boolean>>({});
+  // キー: articleId → boolean。DB値 (isFavDb) からの上書きを保持する楽観的UI用のMap
+  const [favOverrides, setFavOverrides] = useState<Record<string, boolean>>({});
 
   const config = SCREEN_CONFIG[screen];
   const meta = SCREEN_META[screen];
-  const articles = DATA[screen];
+  const { articles, loading, error } = useArticles(screen);
 
   const getOpen = (key: string, i: number) => {
     if (key in openStates) return openStates[key];
     return i === 0 && !!config.expand;
   };
 
-  const getFav = (key: string) => {
-    if (key in favStates) return favStates[key];
-    return !!config.favDefault;
+  // 楽観的UI: favOverrides に上書き値があればそちらを、なければ DB 値を使う
+  const getFav = (articleId: string, isFavDb: boolean) => {
+    if (articleId in favOverrides) return favOverrides[articleId];
+    return isFavDb;
   };
 
   const toggleOpen = (key: string, i: number) =>
     setOpenStates(prev => ({ ...prev, [key]: !getOpen(key, i) }));
 
-  const toggleFav = (key: string) =>
-    setFavStates(prev => ({ ...prev, [key]: !getFav(key) }));
+  const handleToggleFav = async (articleId: string, currentFav: boolean) => {
+    // 楽観的 UI 更新（即座に表示を切り替える）
+    const nextFav = !currentFav;
+    setFavOverrides(prev => ({ ...prev, [articleId]: nextFav }));
+
+    // Supabase に is_favorite を更新する（失敗はコンソールのみ、UX を止めない）
+    try {
+      const { error: updateError } = await supabase
+        .from('articles')
+        .update({ is_favorite: nextFav })
+        .eq('id', articleId);
+
+      if (updateError) {
+        console.error('[ListPage] is_favorite update failed:', updateError.message);
+        // ロールバック（DB 更新失敗時は表示を元に戻す）
+        setFavOverrides(prev => ({ ...prev, [articleId]: currentFav }));
+      }
+    } catch (err) {
+      console.error('[ListPage] is_favorite update error:', err);
+      setFavOverrides(prev => ({ ...prev, [articleId]: currentFav }));
+    }
+  };
 
   return (
     <div>
@@ -56,14 +89,33 @@ export default function ListPage({ screen }: Props) {
         </p>
       </div>
 
-      {/* Article list */}
+      {/* Article list / Loading / Error / Empty */}
       <div style={{
         display: 'flex', flexDirection: 'column',
         gap: 12,
         padding: 'clamp(4px, 1vw, 8px) clamp(16px, 3vw, 32px) clamp(24px, 4vw, 40px)',
       }}>
-        {articles.map((article, i) => {
-          const key = `${screen}__${i}`;
+        {loading && (
+          <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>
+            読み込み中…
+          </p>
+        )}
+
+        {!loading && error && (
+          <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>
+            データの取得に失敗しました
+          </p>
+        )}
+
+        {!loading && !error && articles.length === 0 && (
+          <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>
+            {EMPTY_MESSAGE[screen]}
+          </p>
+        )}
+
+        {!loading && !error && articles.map((article, i) => {
+          const key = `${screen}__${article.id}`;
+          const isFav = getFav(article.id, article.isFavDb);
           return (
             <ArticleCard
               key={key}
@@ -71,9 +123,9 @@ export default function ListPage({ screen }: Props) {
               config={config}
               index={i}
               isOpen={getOpen(key, i)}
-              isFav={getFav(key)}
+              isFav={isFav}
               onToggleOpen={() => toggleOpen(key, i)}
-              onToggleFav={() => toggleFav(key)}
+              onToggleFav={() => void handleToggleFav(article.id, isFav)}
             />
           );
         })}

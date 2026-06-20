@@ -2,15 +2,16 @@ export type Screen = 'top5' | 'update' | 'tips' | 'tipsGemini' | 'fav';
 export type SourceType = 'github' | 'zenn' | 'qiita' | 'hatena' | 'google';
 
 export interface Article {
-  titleA: string;
-  titleB?: string;
-  src?: SourceType;
-  date: string;
-  imp: number;
-  full: string;
-  short?: string;
-  claude?: boolean;
-  tag?: string;
+  id: string;            // uuid
+  url: string;           // 元記事 URL
+  titleA: string;        // title
+  src?: SourceType;      // source から変換
+  date: string;          // published_at をフォーマット（'YYYY/MM/DD'）
+  imp: number;           // importance_score
+  full: string;          // summary_ja（なければ excerpt）
+  claude?: boolean;      // product === 'claude_code'
+  tag?: string;          // category（update 画面で表示）
+  isFavDb: boolean;      // DB の is_favorite
 }
 
 export interface ScreenConfig {
