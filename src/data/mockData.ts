@@ -1,6 +1,8 @@
-import type { Article, Screen, ScreenConfig, ScreenMeta } from '../types';
+import type { Screen, ScreenConfig, ScreenMeta } from '../types';
 
-export const DATA: Record<Screen, Article[]> = {
+// バックアップ用モックデータ。本番では使用しない（useArticles フックが DB から取得）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const DATA: Record<Screen, any[]> = {
   top5: [
     {
       titleA: 'Claude Code v2.1.177 リリース',

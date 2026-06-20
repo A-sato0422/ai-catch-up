@@ -42,7 +42,6 @@ export default function ListPage({ screen }: Props) {
     setOpenStates(prev => ({ ...prev, [key]: !getOpen(key, i) }));
 
   const handleToggleFav = async (articleId: string, currentFav: boolean) => {
-    // 楽観的 UI 更新（即座に表示を切り替える）
     const nextFav = !currentFav;
     setFavOverrides(prev => ({ ...prev, [articleId]: nextFav }));
 
