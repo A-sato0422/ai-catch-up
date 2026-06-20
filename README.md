@@ -1,73 +1,121 @@
-# React + TypeScript + Vite
+# AI Catchup
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Claude Code / Gemini の最新情報アグリゲーター。
 
-Currently, two official plugins are available:
+「1 日 1 回見るだけでキャッチアップが完了する」を目指した特化ツール。汎用 RSS リーダーの「足し算（全部見せる）」ではなく、**引き算（今日の重要なものだけに絞る）** がコンセプト。英語の一次情報は Gemini API による日本語要約で提示する。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 技術スタック
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| 領域 | 技術 |
+|---|---|
+| フロントエンド | React + TypeScript + Vite + Tailwind CSS |
+| ルーティング | React Router v6 |
+| ホスティング | Vercel |
+| DB / BaaS | Supabase (PostgreSQL) |
+| バッチ実行 | GitHub Actions（cron + workflow_dispatch） |
+| バッチ言語 | TypeScript（Node.js 20） |
+| LLM | Gemini API（要約・分類・重要度判定） |
 
-## Expanding the ESLint configuration
+フロントとバッチは疎結合。フロントは Supabase を読むだけ。収集・加工は GitHub Actions 側に閉じる。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## ディレクトリ構成
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+.
+├── index.html                # フロントのエントリ
+├── src/                      # フロントのソース（React + Vite）
+│   ├── components/
+│   ├── hooks/useArticles.ts
+│   ├── pages/
+│   └── lib/supabase.ts
+├── batch/                    # 収集・加工バッチ
+│   └── src/
+│       ├── sources/          # ソースアダプタ（GitHub/Qiita/Zenn/はてブ/Google 等）
+│       ├── llm/              # LLM プロバイダ（Gemini）
+│       ├── lib/              # 共通ライブラリ（URL 正規化・upsert 等）
+│       ├── collect.ts        # 収集パイプライン
+│       └── cleanup.ts        # 古い記事削除
+└── .github/workflows/
+    ├── collect.yml           # 毎日 07:00 JST
+    └── cleanup.yml           # 毎週日曜 08:00 JST
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 画面構成
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| URL | 画面 |
+|---|---|
+| `/` | ホーム（ロボット + 5 ナビボタン） |
+| `/top5` | 今日の TOP5（当日記事を重要度順） |
+| `/update` | アップデート一覧 |
+| `/tips` | Tips（Claude Code） |
+| `/tips-gemini` | Tips（Gemini） |
+| `/fav` | お気に入り |
+
+---
+
+## 情報ソース
+
+- GitHub Releases（`anthropics/claude-code` / `google-gemini/gemini-cli`）
+- Qiita（ClaudeCode / Gemini タグ）
+- Zenn（claudecode / gemini トピック）
+- はてなブックマーク（キーワード検索）
+- Google Developers Blog / DeepMind Blog（Gemini キーワードフィルタ）
+- Anthropic News（第三者フィード）
+
+---
+
+## セットアップ
+
+### 1. 環境変数
+
+`.env.example` をコピーして `.env` を作成する。
+
+```
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=   # バッチ専用（フロントには絶対出さない）
+VITE_SUPABASE_URL=      # フロント用
+VITE_SUPABASE_ANON_KEY= # フロント用（anon key + RLS）
+GEMINI_API_KEY=
+QIITA_TOKEN=            # 任意（未設定でも動作するが取得件数が減る）
+```
+
+> **セキュリティ注意**
+> - `.env*` は `.gitignore` 登録済み。コミット前に `git diff` で鍵の混入がないか確認すること。
+> - `SUPABASE_SERVICE_KEY` は GitHub Actions 専用。フロントコードに絶対含めない。
+> - 万一鍵を push してしまった場合は、履歴削除に加えて**必ずキーをローテーション（再発行）**する。
+
+### 2. Supabase セットアップ
+
+1. Supabase プロジェクトを作成する。
+2. SQL Editor で `supabase/migrations/001_create_articles.sql` を実行する。
+3. SQL Editor で `supabase/migrations/002_fix_grants.sql` を実行する。
+4. Project URL / anon key / service_role key を取得して `.env` に設定する。
+
+### 3. GitHub Actions Secrets
+
+リポジトリの Settings > Secrets and variables > Actions に以下を登録する。
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `GEMINI_API_KEY`
+- `QIITA_TOKEN`
+
+### 4. ローカル実行
+
+```bash
+# フロント（リポジトリルートで実行）
+npm install
+npm run dev
+
+# バッチ（疎通確認用に BACKFILL_DAYS=1 を推奨）
+cd batch
+npm install
+BACKFILL_DAYS=1 npm run collect   # 収集 → 加工 → Supabase 保存
+npm run cleanup                   # 古い記事削除（30 日超・非お気に入り）
 ```
