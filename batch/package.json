@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "rss-parser": "^3.13.0"
   }
 }

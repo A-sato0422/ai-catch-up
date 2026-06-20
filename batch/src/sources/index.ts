@@ -1,17 +1,24 @@
 // ソースアダプタ登録配列（SPEC §3 / CLAUDE.md §3.1）
 // 新ソース追加 = アダプタ実装 + ここに 1 行追加（既存コード変更なし）
 import type { SourceAdapter } from '../types.js';
-
-// フェーズ 2 で各アダプタをここに import して配列に追加する
-// import { githubReleasesClaudeCode } from './githubReleases.js';
-// import { githubReleasesGeminiCli } from './githubReleases.js';
-// import { qiitaClaudeCode, qiitaGemini } from './qiita.js';
-// import { zennClaudeCode, zennGemini } from './zenn.js';
-// import { hatenaClaudeCode, hatenaGemini } from './hatena.js';
-// import { deepmindBlog } from './deepmind.js';
-// import { googleDevBlog } from './googleDevBlog.js';
-// import { anthropicNews } from './anthropicNews.js';
+import { githubReleasesClaudeCode, githubReleasesGeminiCli } from './githubReleases.js';
+import { qiitaClaudeCode, qiitaGemini } from './qiita.js';
+import { zennClaudeCode, zennGemini } from './zenn.js';
+import { hatenaClaudeCode, hatenaGemini } from './hatena.js';
+import { deepmindBlog } from './deepmind.js';
+import { googleDevBlog } from './googleDevBlog.js';
+import { anthropicNews } from './anthropicNews.js';
 
 export const sources: SourceAdapter[] = [
-  // アダプタをここに追加する
+  githubReleasesClaudeCode,
+  githubReleasesGeminiCli,
+  qiitaClaudeCode,
+  qiitaGemini,
+  zennClaudeCode,
+  zennGemini,
+  hatenaClaudeCode,
+  hatenaGemini,
+  deepmindBlog,
+  googleDevBlog,
+  anthropicNews,
 ];
