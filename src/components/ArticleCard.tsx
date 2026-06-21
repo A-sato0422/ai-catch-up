@@ -167,8 +167,8 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
           {displayText}
         </div>
 
-        {/* Open article link — shown expanded, only for non-externalBadge screens */}
-        {config.expand && isOpen && !config.externalBadge && (
+        {/* Open article link — shown expanded, below description (all screens) */}
+        {config.expand && isOpen && (
           <a
             href={article.url}
             target="_blank"
@@ -217,28 +217,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
             重要度 {article.imp}
           </span>
 
-          {/* External link badge — shown inline next to importance (update screen), only when expanded */}
-          {config.externalBadge && isOpen && (
-            <a
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '4px 10px', borderRadius: 8,
-                border: '1px solid var(--pill-line)',
-                background: 'var(--pill-bg)',
-                fontSize: 12, fontWeight: 600, color: 'var(--muted2)',
-                textDecoration: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <ExternalLinkIcon />
-              元記事
-            </a>
-          )}
         </div>
       </div>
 

@@ -22,7 +22,6 @@ export interface ScreenConfig {
   hasTag?: boolean;
   chevron?: boolean;
   external?: boolean;
-  externalBadge?: boolean;
   expand?: boolean;
   favDefault?: boolean;
 }

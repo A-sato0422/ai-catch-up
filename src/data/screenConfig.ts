@@ -2,7 +2,7 @@ import type { Screen, ScreenConfig, ScreenMeta } from '../types';
 
 export const SCREEN_CONFIG: Record<Screen, ScreenConfig> = {
   top5:       { hasNumber: true,  hasSource: true,  chevron: true,  expand: true },
-  update:     { hasBar: true, hasBrand: true, hasSource: true, chevron: true, expand: true, externalBadge: true },
+  update:     { hasBar: true, hasBrand: true, hasSource: true, chevron: true, expand: true },
   tips:       { hasSource: true,  chevron: true,  expand: true },
   tipsGemini: { hasSource: true,  chevron: true,  expand: true },
   fav:        { hasBar: true, hasSource: true, chevron: true, expand: true, favDefault: true },
