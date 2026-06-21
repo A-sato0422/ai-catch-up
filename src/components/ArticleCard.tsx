@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Article, ScreenConfig } from '../types';
 import SourceBadge from './SourceBadge';
 
@@ -57,17 +58,28 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
   const isClaude = article.claude !== false;
   const barColor = isClaude ? '#ff5a2c' : '#2f6df0';
   const displayText = article.full;
+  const [hovered, setHovered] = useState(false);
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'stretch',
-      borderRadius: 16,
-      overflow: 'hidden',
-      border: '1px solid var(--card-line)',
-      background: 'var(--card)',
-      boxShadow: 'var(--card-shadow)',
-    }}>
+    <div
+      onClick={onToggleOpen}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        borderRadius: 16,
+        overflow: 'hidden',
+        border: `1px solid ${hovered ? 'var(--card-line-hover, var(--card-line))' : 'var(--card-line)'}`,
+        background: 'var(--card)',
+        boxShadow: hovered
+          ? '0 8px 28px rgba(0,0,0,.13), 0 2px 8px rgba(0,0,0,.07)'
+          : 'var(--card-shadow)',
+        cursor: 'pointer',
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+        transition: 'box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease',
+      }}
+    >
       {/* Color bar */}
       {config.hasBar && (
         <span style={{ width: 5, flexShrink: 0, background: barColor }} />
@@ -161,6 +173,7 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
             href={article.url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
             style={{
               marginTop: 14,
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -204,12 +217,13 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
             重要度 {article.imp}
           </span>
 
-          {/* External link badge — shown inline next to importance (update screen) */}
-          {config.externalBadge && (
+          {/* External link badge — shown inline next to importance (update screen), only when expanded */}
+          {config.externalBadge && isOpen && (
             <a
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '4px 10px', borderRadius: 8,
@@ -236,7 +250,7 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
       }}>
         {/* Fav toggle */}
         <button
-          onClick={onToggleFav}
+          onClick={e => { e.stopPropagation(); onToggleFav(); }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             width: 32, height: 32, borderRadius: 8,
@@ -253,7 +267,7 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
         {/* Chevron (expand/collapse) */}
         {config.chevron && (
           <button
-            onClick={onToggleOpen}
+            onClick={e => { e.stopPropagation(); onToggleOpen(); }}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 32, height: 32, borderRadius: 8,

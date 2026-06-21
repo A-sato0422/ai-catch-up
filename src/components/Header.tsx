@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import robotIcon from '../assets/robots/robot_01.png';
 
 function LogoIcon() {
   return (
@@ -8,19 +9,19 @@ function LogoIcon() {
         width: 38,
         height: 38,
         borderRadius: 11,
-        background: 'var(--logo-bg)',
+        background: '#fff',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         flexShrink: 0,
+        overflow: 'hidden',
       }}
     >
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <rect x="3" y="6" width="16" height="11" rx="3" fill="#2f6df0" opacity=".18" />
-        <rect x="6" y="3" width="10" height="12" rx="3" fill="#ff5a2c" opacity=".22" />
-        <circle cx="11" cy="10" r="4.5" fill="#ff5a2c" />
-        <circle cx="11" cy="10" r="2" fill="#fff" />
-      </svg>
+      <img
+        src={robotIcon}
+        alt=""
+        style={{ width: 44, height: 44, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }}
+      />
     </span>
   );
 }

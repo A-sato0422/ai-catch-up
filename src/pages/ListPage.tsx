@@ -41,9 +41,8 @@ export default function ListPage({ screen }: Props) {
   const meta = SCREEN_META[screen];
   const { articles, loading, error } = useArticles(screen);
 
-  const getOpen = (key: string, i: number) => {
-    if (key in openStates) return openStates[key];
-    return i === 0 && !!config.expand;
+  const getOpen = (key: string) => {
+    return openStates[key] ?? false;
   };
 
   // 楽観的UI: favOverrides に上書き値があればそちらを、なければ DB 値を使う
@@ -52,8 +51,8 @@ export default function ListPage({ screen }: Props) {
     return isFavDb;
   };
 
-  const toggleOpen = (key: string, i: number) =>
-    setOpenStates(prev => ({ ...prev, [key]: !getOpen(key, i) }));
+  const toggleOpen = (key: string) =>
+    setOpenStates(prev => ({ ...prev, [key]: !getOpen(key) }));
 
   const handleToggleFav = async (articleId: string, currentFav: boolean) => {
     const nextFav = !currentFav;
@@ -144,9 +143,9 @@ export default function ListPage({ screen }: Props) {
               article={article}
               config={config}
               index={i}
-              isOpen={getOpen(key, i)}
+              isOpen={getOpen(key)}
               isFav={isFav}
-              onToggleOpen={() => toggleOpen(key, i)}
+              onToggleOpen={() => toggleOpen(key)}
               onToggleFav={() => void handleToggleFav(article.id, isFav)}
             />
           );
