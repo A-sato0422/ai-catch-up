@@ -1,9 +1,13 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import Header from './Header';
+import BottomNav from './BottomNav';
 
 export default function Layout() {
   const { dark } = useTheme();
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+
   return (
     <div
       data-theme={dark ? 'dark' : 'light'}
@@ -19,11 +23,14 @@ export default function Layout() {
         style={{
           maxWidth: 1180,
           background: 'var(--win-bg)',
+          paddingBottom: isHome ? 0 : 100,
         }}
       >
         <Header />
         <Outlet />
       </div>
+
+      {!isHome && <BottomNav />}
     </div>
   );
 }

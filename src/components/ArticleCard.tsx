@@ -35,7 +35,7 @@ function ChevronIcon({ up }: { up: boolean }) {
 
 function ExternalLinkIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+    <svg width="14" height="14" viewBox="0 0 15 15" fill="none">
       <path d="M5.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3"
         stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       <path d="M8.5 1.5h5v5M13.5 1.5l-6 6"
@@ -56,7 +56,7 @@ function CalendarIcon() {
 export default function ArticleCard({ article, config, index, isOpen, isFav, onToggleOpen, onToggleFav }: Props) {
   const isClaude = article.claude !== false;
   const barColor = isClaude ? '#ff5a2c' : '#2f6df0';
-  const displayText = isOpen ? article.full : article.full;
+  const displayText = article.full;
 
   return (
     <div style={{
@@ -138,14 +138,14 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
         )}
 
         {/* Title */}
-        <div style={{ color: 'var(--title)', fontSize: 15, fontWeight: 700, lineHeight: 1.45 }}>
+        <div style={{ color: 'var(--title)', fontSize: 16, fontWeight: 700, lineHeight: 1.5 }}>
           {article.titleA}
         </div>
 
         {/* Description */}
         <div style={{
           marginTop: 8,
-          fontSize: 13, lineHeight: 1.75,
+          fontSize: 14, lineHeight: 1.8,
           color: 'var(--muted2)',
           display: '-webkit-box',
           WebkitLineClamp: isOpen ? undefined : 2,
@@ -155,8 +155,8 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
           {displayText}
         </div>
 
-        {/* Open article link — shown only when expanded */}
-        {config.expand && isOpen && (
+        {/* Open article link — shown expanded, only for non-externalBadge screens */}
+        {config.expand && isOpen && !config.externalBadge && (
           <a
             href={article.url}
             target="_blank"
@@ -183,17 +183,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 14 }}>
           {config.hasSource && article.src && <SourceBadge source={article.src} />}
 
-          {/* Tag badge (update screen) */}
-          {config.hasTag && article.tag && (
-            <span style={{
-              padding: '4px 10px', borderRadius: 8,
-              background: 'var(--pill-bg)', border: '1px solid var(--pill-line)',
-              fontSize: 12, fontWeight: 600, color: 'var(--muted2)',
-            }}>
-              {article.tag}
-            </span>
-          )}
-
           {/* Date badge */}
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -214,6 +203,28 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
           }}>
             重要度 {article.imp}
           </span>
+
+          {/* External link badge — shown inline next to importance (update screen) */}
+          {config.externalBadge && (
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 8,
+                border: '1px solid var(--pill-line)',
+                background: 'var(--pill-bg)',
+                fontSize: 12, fontWeight: 600, color: 'var(--muted2)',
+                textDecoration: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <ExternalLinkIcon />
+              元記事
+            </a>
+          )}
         </div>
       </div>
 
@@ -255,27 +266,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
           >
             <ChevronIcon up={isOpen} />
           </button>
-        )}
-
-        {/* External link (update screen) */}
-        {config.external && (
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, borderRadius: 8,
-              border: '1px solid var(--pill-line)',
-              background: 'var(--pill-bg)',
-              cursor: 'pointer',
-              color: 'var(--muted2)',
-              textDecoration: 'none',
-            }}
-            aria-label="元記事を開く"
-          >
-            <ExternalLinkIcon />
-          </a>
         )}
       </div>
     </div>

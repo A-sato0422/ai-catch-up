@@ -174,7 +174,6 @@ export default function HomePage() {
           style={{
             width: 'clamp(100px, 16vw, 160px)',
             flexShrink: 0,
-            filter: 'drop-shadow(0 12px 22px rgba(40,80,160,.15))',
             animation: 'fadeInUp 0.45s ease 0.25s both',
           }}
         />

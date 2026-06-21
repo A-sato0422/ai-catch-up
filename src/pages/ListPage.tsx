@@ -9,16 +9,30 @@ interface Props {
   screen: Screen;
 }
 
-// スクリーンごとの空状態メッセージ
+const robotImages = Object.values(
+  import.meta.glob<{ default: string }>('../assets/robots/*.png', { eager: true })
+).map(m => m.default);
+
 const EMPTY_MESSAGE: Record<Screen, string> = {
   top5:       '今日の記事はまだありません',
   update:     'アップデート情報はまだありません',
   tips:       'Tips 記事はまだありません',
   tipsGemini: 'Tips 記事はまだありません',
-  fav:        'お気に入りはまだありません ★ をタップして追加しよう',
+  fav:        'まだお気に入りはありません',
+};
+
+const EMPTY_SUB: Record<Screen, string> = {
+  top5:       '収集バッチが完了すると重要記事が表示されます',
+  update:     'Claude Code・Gemini の最新情報が届くと表示されます',
+  tips:       'Tips 記事が収集されると表示されます',
+  tipsGemini: 'Tips 記事が収集されると表示されます',
+  fav:        '記事の ★ をタップするとここに保存されます',
 };
 
 export default function ListPage({ screen }: Props) {
+  const [emptyRobotSrc] = useState<string>(
+    () => robotImages[Math.floor(Math.random() * robotImages.length)]
+  );
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
   // キー: articleId → boolean。DB値 (isFavDb) からの上書きを保持する楽観的UI用のMap
   const [favOverrides, setFavOverrides] = useState<Record<string, boolean>>({});
@@ -107,9 +121,18 @@ export default function ListPage({ screen }: Props) {
         )}
 
         {!loading && !error && articles.length === 0 && (
-          <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '40px 0' }}>
-            {EMPTY_MESSAGE[screen]}
-          </p>
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '48px 20px', gap: 14,
+          }}>
+            <img src={emptyRobotSrc} alt="" style={{ width: 120, opacity: 0.85 }} />
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--title)', textAlign: 'center' }}>
+              {EMPTY_MESSAGE[screen]}
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)', textAlign: 'center', maxWidth: 300 }}>
+              {EMPTY_SUB[screen]}
+            </p>
+          </div>
         )}
 
         {!loading && !error && articles.map((article, i) => {

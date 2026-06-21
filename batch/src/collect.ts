@@ -14,7 +14,7 @@ async function fetchExistingUrls(urls: string[]): Promise<Set<string>> {
   return new Set((data ?? []).map((r: { url: string }) => r.url));
 }
 
-export async function collect(backfillDays = 0): Promise<void> {
+export async function collect(backfillDays = 1): Promise<void> {
   const llm = createLLMProvider();
   const llmProviderName = process.env.LLM_PROVIDER ?? 'gemini';
   const rawArticles: RawArticle[] = [];

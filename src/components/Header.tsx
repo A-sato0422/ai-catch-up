@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 
 function LogoIcon() {
@@ -37,19 +37,9 @@ function MoonIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function BackArrow() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export default function Header() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { dark, toggleDark } = useTheme();
-  const isHome = location.pathname === '/';
 
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric',
@@ -96,29 +86,6 @@ export default function Header() {
           AI Catchup
         </span>
       </button>
-
-      {/* Back button */}
-      {!isHome && (
-        <button
-          onClick={() => navigate('/')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            cursor: 'pointer',
-            border: 'none',
-            background: 'none',
-            padding: '4px 8px',
-            borderRadius: 6,
-            color: 'var(--muted2)',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          <BackArrow />
-          ホーム
-        </button>
-      )}
 
       <div style={{ flex: 1 }} />
 

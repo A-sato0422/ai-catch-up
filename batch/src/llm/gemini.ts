@@ -18,7 +18,7 @@ function buildPrompt(title: string, excerpt: string): string {
 本文抜粋: ${excerpt}
 
 出力形式（厳密なJSON）:
-{"summary_ja":"日本語3行程度の要約","category":"update または tips","importance_score":1から10の整数}
+{"summary_ja":"日本語6〜8行程度の要約（各要点を具体的に記述）","category":"update または tips","importance_score":1から10の整数}
 
 分類ルール:
 - update: 新機能・リリース・アップデート・仕様変更などプロダクト自体の変化
