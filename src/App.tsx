@@ -1,12 +1,17 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import ListPage from './pages/ListPage';
+import SplashScreen, { shouldShowSplash } from './components/SplashScreen';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
+
   return (
     <ThemeProvider>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>

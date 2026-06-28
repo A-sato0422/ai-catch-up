@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const robotImages = Object.values(
-  import.meta.glob<{ default: string }>('../assets/robots/*.png', { eager: true })
-).map(m => m.default);
+import lottie from 'lottie-web';
+import RobotSaludando from '../assets/lottie/RobotSaludando.json';
 
 const ICON_COLOR = 'var(--muted)';
 const FULL_TEXT = 'おはよう。今日は重要な記事が3件。\nClaude Code に破壊的変更があるよ。';
@@ -127,11 +125,21 @@ function HeartIcon() {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [robotSrc] = useState<string>(
-    () => robotImages[Math.floor(Math.random() * robotImages.length)]
-  );
+  const robotRef = useRef<HTMLDivElement>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [showCursor, setShowCursor] = useState(false);
+
+  useEffect(() => {
+    if (!robotRef.current) return;
+    const anim = lottie.loadAnimation({
+      container: robotRef.current,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      animationData: RobotSaludando,
+    });
+    return () => anim.destroy();
+  }, []);
 
   useEffect(() => {
     const startTimer = setTimeout(() => {
@@ -167,12 +175,11 @@ export default function HomePage() {
         gap: 'clamp(16px, 3vw, 32px)',
         width: '100%', maxWidth: 700,
       }}>
-        {/* Robot image */}
-        <img
-          src={robotSrc}
-          alt=""
+        {/* Robot Lottie animation */}
+        <div
+          ref={robotRef}
           style={{
-            width: 'clamp(100px, 16vw, 160px)',
+            width: 'clamp(160px, 24vw, 260px)',
             flexShrink: 0,
             animation: 'fadeInUp 0.45s ease 0.25s both',
           }}
