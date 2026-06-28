@@ -9,10 +9,11 @@ export function shouldShowSplash(): boolean {
 }
 
 interface Props {
+  onFadeStart: () => void;
   onDone: () => void;
 }
 
-export default function SplashScreen({ onDone }: Props) {
+export default function SplashScreen({ onFadeStart, onDone }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [fading, setFading] = useState(false);
 
@@ -28,6 +29,7 @@ export default function SplashScreen({ onDone }: Props) {
     });
 
     anim.addEventListener('complete', () => {
+      onFadeStart(); // アプリ側のフェードインを同時に開始
       setFading(true);
       setTimeout(() => {
         sessionStorage.setItem(STORAGE_KEY, '1');
@@ -36,7 +38,7 @@ export default function SplashScreen({ onDone }: Props) {
     });
 
     return () => anim.destroy();
-  }, [onDone]);
+  }, [onFadeStart, onDone]);
 
   return (
     <div
