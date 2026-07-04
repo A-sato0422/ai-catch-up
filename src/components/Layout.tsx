@@ -7,6 +7,10 @@ export default function Layout() {
   const { dark } = useTheme();
   const { pathname } = useLocation();
   const isHome = pathname === '/';
+  // 設定画面は保存/キャンセルの独自フッターを持つため、BottomNav は出さない
+  // （BottomNav 遷移で編集中の選択が破棄される事故も防ぐ）
+  const isSettings = pathname === '/settings';
+  const showBottomNav = !isHome && !isSettings;
 
   return (
     <div
@@ -23,14 +27,14 @@ export default function Layout() {
         style={{
           maxWidth: 1180,
           background: 'var(--win-bg)',
-          paddingBottom: isHome ? 0 : 100,
+          paddingBottom: showBottomNav ? 100 : 0,
         }}
       >
         <Header />
         <Outlet />
       </div>
 
-      {!isHome && <BottomNav />}
+      {showBottomNav && <BottomNav />}
     </div>
   );
 }

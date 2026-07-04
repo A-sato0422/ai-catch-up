@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import ListPage from './pages/ListPage';
+import SettingsPage from './pages/SettingsPage';
 import SplashScreen, { shouldShowSplash } from './components/SplashScreen';
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
                 <Route path="/tips" element={<ListPage screen="tips" />} />
                 <Route path="/tips-gemini" element={<ListPage screen="tipsGemini" />} />
                 <Route path="/fav" element={<ListPage screen="fav" />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Routes>
           </BrowserRouter>

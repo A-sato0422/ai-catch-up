@@ -178,27 +178,42 @@ interface ScreenConfig {
   icon: string;
   filter: {
     product?: Product;
-    category?: Category;
+    category?: Category[];   // 複数指定可（例: tips + case_study の統合ボタン）
     audience?: Audience;
-    difficulty?: number;
+    difficulty?: number[];   // 複数指定可（例: 初級+中級を 1 ボタンに統合）
     keywords?: string[];
   };
   sort: 'importance' | 'published_at';
 }
 ```
 
-### 7.2 設定画面のチェックボックス構成
+`category` / `difficulty` は**配列**とし、Supabase の `.in()` でフィルタする。同一グループ内の複数チェックを 1 ボタンへ統合するため（§7.2）。
 
-チェック = ホーム画面にボタン表示。**TOP5 とお気に入りは固定枠**（チェック対象外・常時表示）。自由選択枠は**最大 4 つまで**（選びすぎ = 足し算への回帰を防ぐ）。
+### 7.2 設定画面のチェックボックス構成（2026-07-04 デザイン確定版・D-035）
 
-| グループ | 項目（product 別） | フィルタ条件 |
+デザイン正本: claude.ai/design プロジェクト「ai chatchup」の `Button Settings.dc.html`。
+
+チェック = ホーム画面にボタン表示。**TOP5 とお気に入りは固定枠**（チェック対象外・常時表示）。ホームのボタンは**合計最大 7 個**（固定 2 + 自由枠最大 5）。
+
+**統合ルール（重要）**: ボタンはチェックボックス単位ではなく**グループ単位**で生成する。同一グループ内で複数チェックした場合は **1 つのボタンに統合**され、フィルタ条件が配列で合成される（例: Gemini の初級+中級+上級を全てチェック → 「Gemini」ボタン 1 個に全難易度の記事が表示される）。グループは 5 つのため、自由枠が 5 を超えることは構造上ない。選択数カウンターは「ボタン数 N/5」を表示する。
+
+| グループ | 項目（チェックボックス） | チェック時に合成されるフィルタ |
 |---|---|---|
-| エンジニア（初級） | Claude Code / Gemini / Codex | `audience=engineer, difficulty=1, category=tips, product=*` |
-| エンジニア（中級） | Claude Code / Gemini / Codex | `audience=engineer, difficulty=2, category=tips, product=*` |
-| エンジニア（上級） | Claude Code / Gemini / Codex | `audience=engineer, difficulty=3, category=tips, product=*` |
-| アップデート | Claude Code / Gemini / Codex | `category=update, product=*` |
-| バックオフィス | — | `audience=backoffice`（tips / case_study） |
-| 経営者向け | — | `audience=executive`（business / case_study） |
+| Gemini | 初級 / 中級 / 上級 | `product=gemini, audience=engineer, difficulty=[選択した難易度]` |
+| Claude Code | 初級 / 中級 / 上級 | `product=claude_code, audience=engineer, difficulty=[選択した難易度]` |
+| Codex | 初級 / 中級 / 上級 | `product=codex, audience=engineer, difficulty=[選択した難易度]` |
+| バックオフィス | 活用Tips / 導入事例 | `audience=backoffice, category=[tips / case_study の選択分]` |
+| 経営者向け | 業界動向 / 導入事例 | `audience=executive, category=[business / case_study の選択分]` |
+
+- **独立した「アップデート」グループは廃止**。エンジニア系フィルタは `category` を絞らないため、update 記事（リリースノート等）は各プロダクトのボタンに難易度別で吸収される（上級の説明文に「リリースノート」を含む。§4.3 の難易度基準どおり、リリースノートの読み解きは上級に寄る）。
+- 各チェックボックスの説明文（デザイン確定・そのまま使用）:
+  - 初級「インストール・環境構築・基本コマンドなど、はじめて使う人向けの情報」
+  - 中級「Skill・Sub Agent・MCP など、機能を使いこなすコツや応用的な使い方」
+  - 上級「リリースノート・最新技術動向・大規模運用など、応用的・専門的な情報」
+  - バックオフィス 活用Tips「採用面接へのAI導入、給与計算の自動化など、日々の業務で使えるAI活用術」
+  - バックオフィス 導入事例「他社のバックオフィス部門でのAI導入事例・実践レポート」
+  - 経営者 業界動向「AI業界の最新動向、リーディングカンパニーの戦略・提携・投資ニュース」
+  - 経営者 導入事例「大企業のAI導入事例、人件費削減効果など経営判断に役立つ実例」
 
 ### 7.3 初回属性選択ポップアップ
 

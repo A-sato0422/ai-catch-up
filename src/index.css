@@ -25,6 +25,11 @@
   --logo-bg: #eaf0f8;
   --hairline: #eef0f2;
   --icon: #aeb4be;
+  --chip-bg: #ffffff;
+  --chip-line: #e6e8ec;
+  --chip-hover: #f7f8fa;
+  --box-line: #cdd2da;
+  --sel-soft: #fdeee8;
 }
 
 [data-theme="dark"] {
@@ -45,6 +50,11 @@
   --logo-bg: #1b2632;
   --hairline: #22272e;
   --icon: #5f6770;
+  --chip-bg: #1b2027;
+  --chip-line: #2c323b;
+  --chip-hover: #20262e;
+  --box-line: #3a424d;
+  --sel-soft: #3a241d;
 }
 
 @keyframes acGlow {

@@ -24,7 +24,7 @@
 |---|---|
 | フロントエンド | React + TypeScript + Vite |
 | CSS | Tailwind CSS（ユーティリティファースト。カスタムカラーは `tailwind.config.ts` で定義） |
-| ルーティング | **React Router v6**（`BrowserRouter`）を使用。TOP5・お気に入りは固定枠、他の画面は `ScreenConfig`（SPEC_EXPANSION §7.1）からデータ駆動で生成（自由枠は最大 4 つ） |
+| ルーティング | **React Router v6**（`BrowserRouter`）を使用。TOP5・お気に入りは固定枠、他の画面は `ScreenConfig`（SPEC_EXPANSION §7.1）からグループ単位で生成（合計最大 7 ボタン = 固定 2 + 自由枠 5。D-035） |
 | レスポンシブ | モバイル・デスクトップ両対応。Tailwind のブレークポイント (`sm:` / `md:` / `lg:`) を使用 |
 | ロボット画像 | `src/assets/robots/` に配置（`robot-search.png` / `robot-rest.png`） |
 | ホスティング（表示） | Vercel |
