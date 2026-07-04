@@ -155,17 +155,16 @@ interface LLMProvider {
 │       │   ├── githubReleases.ts  # claude-code / gemini-cli / codex
 │       │   ├── qiita.ts
 │       │   ├── zenn.ts
-│       │   ├── hatena.ts
+│       │   ├── hatena.ts          # 既存 + 導入事例/ビジネス系の検索クエリ 2 本（Google News は不採用。D-034）
 │       │   ├── anthropicNews.ts
-│       │   ├── googleNews.ts      # Google News RSS 検索（クエリをパラメータ化）
-│       │   └── prtimes.ts         # または itmedia.ts（実物確認の結果で決定）
+│       │   └── itmedia.ts         # ITmedia AI+（PR TIMES は却下。D-033）
 │       ├── llm/              # LLM プロバイダ（3.2）
 │       │   ├── index.ts      # プロバイダ選択（env）
 │       │   ├── gemini.ts
 │       │   └── claude.ts     # 将来用スタブ可
 │       ├── lib/
 │       │   ├── normalizeUrl.ts  # URL 正規化（3.3）
-│       │   ├── relevance.ts     # キーワード関連度フィルタ（Google News 等は必須）
+│       │   ├── relevance.ts     # キーワード関連度フィルタ（はてブ検索・ITmedia 等は必須）
 │       │   └── supabase.ts
 │       ├── collect.ts        # 収集パイプライン本体
 │       ├── summarize.ts      # 当日 TOP5 → 一言サマリー生成（daily_summaries へ upsert）

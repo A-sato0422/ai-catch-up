@@ -176,6 +176,23 @@
 - **理由**: 追加コールは 1 日 1 回のみで枠への影響が無視できる。属性別に作り分けると属性の組み合わせ分コールが増えるため、共通 1 本とする。
 - **却下案**: ハードコード継続。属性別サマリー生成（コール数増・引き算思想にも反する）。
 
+### D-033. 新ソースの実物確認に基づく採用・調整（2026-07-04 確認）
+- **決定**:
+  - (a) openai/codex は `https://github.com/openai/codex/releases.atom` を採用。ただし `rust-vX.Y.Z-alpha.N` 形式の alpha ビルドが毎日大量に流れるため、**安定版のみに絞るフィルタ（`-alpha`/`-beta`/`-rc` 除外）を必須**とする（D-020 の gemini-cli nightly 対応と同型）。
+  - (b) Qiita の Codex タグ slug は `codex`（記事 908 件）、Zenn は `https://zenn.dev/topics/codex/feed` で確定。
+  - (c) Google News RSS 検索は「生成AI 導入事例」「生成AI ビジネス」の 2 クエリを採用（各 100 件返却・関連度良好）。クエリは **UTF-8 パーセントエンコード必須**。
+  - (d) ビジネス系メディアは **ITmedia AI+**（`https://rss.itmedia.co.jp/rss/2.0/aiplus.xml`）を採用し、**PR TIMES は却下**。
+- **理由**: ITmedia AI+ は AI 専門で全 20 件が対象ドメインに合致し、元記事 URL 直リンク・pubDate も正常。PR TIMES の `index.rdf` は全業種プレスリリース約 200 件の firehose で AI に絞る手段が無く、関連度フィルタ頼みになりノイズ混入リスクが大きい。
+- **却下案**: PR TIMES 採用（上記の通り絞り込み不能）。codex の全リリース取り込み（alpha でフィード汚染。gemini-cli と同じ轍）。
+- **補足（Google News の制約・許容済み）**: `<link>` が元記事ではなく `news.google.com/rss/articles/{不透明ID}` のリダイレクト URL のため、**他ソースとの横断重複排除（D-007 の意図）は Google News 由来記事には効かない**（同一 ID 同士では効く）。また description が薄く、enrich 入力はタイトル中心になる。導入事例・ビジネス系は他ソースと記事が被りにくいため許容する。
+- （追記）**(c) の Google News 採用は D-034 により撤回**。上記の許容済み制約が、はてブ検索への置き換えで全て解消できると判明したため。(a)(b)(d) は有効なまま。
+
+### D-034. 導入事例・ビジネス系ソースは Google News をやめ、はてブ検索 RSS を採用（2026-07-04 確認）
+- **決定**: 導入事例系・ビジネス系の 2 クエリは、Google News RSS 検索ではなく**はてなブックマーク検索 RSS** で取得する。URL 形式は `https://b.hatena.ne.jp/q/{UTF-8 %エンコード済みクエリ}?mode=rss&sort=recent&target={title|text}&users=1`。初期クエリは「**AI 導入**」（`target=title`）と「**生成AI ビジネス**」（`target=text`）の 2 本（各 40 件返却・当日分あり・実測確認済み。運用しながら調整可）。
+- **理由**: Google News の許容済み制約（D-033 補足）が、はてブ検索なら全て解消される。(1) `<link>` が元記事直リンクのため **D-007 の横断重複排除がそのまま機能**、(2) `hatena:bookmarkcount` により **D-031 の popularity / rank が使える**、(3) description に本文抜粋があり enrich 入力の質が上がる、(4) **既存の hatena アダプタにクエリを追加するだけ**で済み、googleNews.ts の新規実装が丸ごと不要（引き算思想にも合致）、(5) 「最低 1 ブクマ」が人間による最低限のスクリーニングとして働く。
+- **却下案**: Google News 継続（網羅性は最大だが上記 4 つのデメリットを許容し続けることになる）。ハイブリッド（はてブ + Google News 併用。googleNews.ts の実装コストが残り、利点が薄い）。AIsmiley の RSS（フィードは存在するが item が 0 件で実用不可）。Ledge.ai（RSS 廃止・404）。
+- **注意**: はてブ検索 `/q/` の**既定はタグ検索（`target=tag`）+ `users=3`** のため、新クエリでは `target` と `users=1` の明示指定が必須（既定のままだと「生成AI 導入事例」は 1 件しかヒットしない）。既存の「Claude Code」クエリはタグ検索のままで問題なし。トレードオフ: 1 ブクマもされない記事は拾えない（許容済み）。無関係記事の混入は残るため relevance.ts のフィルタは引き続き必須。
+
 ---
 
 ## 運用ルール

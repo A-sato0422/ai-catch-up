@@ -9,20 +9,23 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 ## Current State（現在地）
 
 - フェーズ: **機能拡張の要件確定済み / 実装 未着手**
-- 次にやること: 「実装前に確認が必要な事項」の消化 → フェーズ A（スキーマ・型の拡張）
+- 事前確認: URL 系 5 件は確認済み（2026-07-04。D-033）。残りはユーザー作業 2 件（AI Studio レート制限の実測確認 / Slack Webhook 発行）のみで、いずれも実装と並行可能（Slack はフェーズ F までに必要）
+- 次にやること: フェーズ A（スキーマ・型の拡張）
 - 前提: LLM は Gemini 3.1 Flash-Lite（15 RPM / 500 RPD）。日次収集上限 合計約 280 件 + サマリー 1 コール
 
 ---
 
 ## 実装前に確認が必要な事項
 
-- [ ] **openai/codex の GitHub Releases Atom URL** … `https://github.com/openai/codex/releases.atom` を実物確認
-- [ ] **Qiita の Codex タグ名** … slug を実物確認（`query=tag:○○` の形式）
-- [ ] **Zenn の Codex トピック名** … `zenn.dev/topics/{topic}/feed` の slug を実物確認
-- [ ] **Google News RSS 検索 URL** … `https://news.google.com/rss/search?q={query}&hl=ja&gl=JP&ceid=JP:ja` の形式と返却内容を実物確認（クエリ 2 本: 導入事例系 / ビジネス系）
-- [ ] **PR TIMES または ITmedia AI+ の RSS URL** … どちらを採用するか実物確認して決定
-- [ ] **AI Studio でプロジェクトの実測レート制限を確認** … Flash-Lite が 15 RPM / 500 RPD であることを確認（枠は予告なく変動するため）
-- [ ] **Slack アプリ作成 + Incoming Webhook URL 発行** … 現行の Slack app 方式で作成（Legacy Custom Integration は使わない）
+（URL 系 5 件は 2026-07-04 に実物確認済み。詳細は D-033）
+
+- [x] **openai/codex の GitHub Releases Atom URL** … `https://github.com/openai/codex/releases.atom` ✅HTTP 200。**ただし `rust-vX.Y.Z-alpha.N` 形式の alpha ビルドが毎日大量に流れる → gemini-cli の nightly と同様、安定版のみに絞るフィルタ必須**（`-alpha` / `-beta` / `-rc` を含むタグを除外）
+- [x] **Qiita の Codex タグ名** … slug は **`codex`** で確定（`query=tag:codex`）。実在確認済み（記事 908 件 / フォロワー 803）
+- [x] **Zenn の Codex トピック名** … **`https://zenn.dev/topics/codex/feed`** ✅HTTP 200・記事あり（トピック名「Codex」）
+- [x] ~~**Google News RSS 検索 URL**~~ … 確認の結果、**不採用に変更（D-034）**。リダイレクト URL で横断重複排除が効かない・人気指標なし・description が薄い・新規アダプタ実装が必要、の 4 点が理由。代替として**はてブ検索 RSS 2 本**を採用: 「AI 導入」（`target=title`）/「生成AI ビジネス」（`target=text`）、いずれも `users=1`・UTF-8 %エンコード・各 40 件返却を実測確認済み。**既定（タグ検索 + users=3）のままだとほぼヒットしないため `target` と `users` の明示が必須**
+- [x] **PR TIMES または ITmedia AI+ の RSS URL** … **ITmedia AI+ を採用**: `https://rss.itmedia.co.jp/rss/2.0/aiplus.xml` ✅20 件・全件 AI 関連・元記事 URL 直リンク・pubDate JST。PR TIMES は却下（`index.rdf` は全業種プレスリリースの firehose で AI 専門フィードが無い。D-033）
+- [ ] **AI Studio でプロジェクトの実測レート制限を確認** … Flash-Lite が 15 RPM / 500 RPD であることを確認（枠は予告なく変動するため）※ユーザー作業
+- [ ] **Slack アプリ作成 + Incoming Webhook URL 発行** … 現行の Slack app 方式で作成（Legacy Custom Integration は使わない）※ユーザー作業
 
 ## フェーズ A: スキーマ・型の拡張（他フェーズの土台）
 
@@ -51,12 +54,12 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 
 ## フェーズ D: 新ソースアダプタ
 
-- [ ] `githubReleases`（openai/codex）… 確認済 URL で追加、登録配列に 1 行
-- [ ] `qiita` に Codex タグのクエリを追加
-- [ ] `zenn` に codex トピックのクエリを追加
-- [ ] `googleNews` アダプタ新規実装（クエリをパラメータ化し 2 本登録）
-- [ ] `prtimes` または `itmedia` アダプタ新規実装（確認結果に応じて）
-- [ ] relevance.ts の強化: Google News / PR TIMES 系用のキーワードフィルタ（「広く取る × きつく濾す」）
+- [ ] `githubReleases`（openai/codex）… `https://github.com/openai/codex/releases.atom` で追加、登録配列に 1 行。**alpha/beta/rc ビルドの除外フィルタ必須**
+- [ ] `qiita` に Codex タグのクエリを追加（`query=tag:codex`）
+- [ ] `zenn` に codex トピックのクエリを追加（`https://zenn.dev/topics/codex/feed`）
+- [ ] `hatena` に検索クエリ 2 本を追加（D-034）: 「AI 導入」（`target=title&users=1`）/「生成AI ビジネス」（`target=text&users=1`）。新規アダプタ実装は不要（既存 hatena アダプタのクエリパラメータ化で対応）
+- [ ] `itmedia` アダプタ新規実装（`https://rss.itmedia.co.jp/rss/2.0/aiplus.xml`）
+- [ ] relevance.ts の強化: はてブ title/text 検索 / ITmedia 系用のキーワードフィルタ（「広く取る × きつく濾す」）
 - [ ] ローカル実行で全クエリの取得件数・カット件数を確認
 
 ## フェーズ E: 一言サマリー（吹き出し）生成
@@ -117,6 +120,6 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 
 ## 未決事項（必要になったら確認）
 
-- PR TIMES / ITmedia AI+ のどちらを採用するか（実物確認の結果で決定）
-- Google News 2 クエリの具体的な検索語（実物確認時に取得結果を見て調整）
+- ~~PR TIMES / ITmedia AI+ のどちらを採用するか~~ → **ITmedia AI+ に決定**（2026-07-04 実物確認。D-033）
+- ~~Google News 2 クエリの具体的な検索語~~ → **Google News 自体を不採用とし、はてブ検索「AI 導入」（title）/「生成AI ビジネス」（text）に決定**（2026-07-04 実物確認。D-034。クエリ語は運用しながら調整可）
 - 将来の本格複数人対応（Supabase 匿名認証 + favorites テーブル移行）… 今回スコープ外

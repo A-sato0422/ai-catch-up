@@ -104,16 +104,20 @@ create table daily_summaries (
 
 ### 5.1 新規ソース
 
-| ソース | product | 取得方法 | 備考 |
-|---|---|---|---|
-| GitHub Releases (openai/codex) | codex | Atom | URL 実物確認要 |
-| Qiita tag:Codex | codex | API v2 | **タグ名を実物確認** |
-| Zenn topics/codex | codex | RSS | **トピック名を実物確認** |
-| Google News RSS 検索「生成AI 導入事例」 | other | RSS | `news.google.com/rss/search?q=...`。**関連度フィルタ必須** |
-| Google News RSS 検索「AI ビジネス/企業」 | other | RSS | 同上 |
-| PR TIMES または ITmedia AI+ | other | RSS | URL 実物確認要。関連度フィルタ必須 |
+全 URL は 2026-07-04 に実物確認済み（詳細は D-033）。
 
-Google News / PR TIMES は検索マッチが緩く無関係記事が混ざりやすいため、**「広く取る × きつく濾す」をセット**とし、relevance.ts のキーワードフィルタ強化を前提条件とする。
+| ソース | product | 取得方法 | エンドポイント（確認済） | 備考 |
+|---|---|---|---|---|
+| GitHub Releases (openai/codex) | codex | Atom | `https://github.com/openai/codex/releases.atom` | ✅確認済。**alpha ビルド多数混入 → `-alpha`/`-beta`/`-rc` 除外フィルタ必須** |
+| Qiita tag:codex | codex | API v2 | `query=tag:codex` | ✅確認済（slug `codex`・記事 908 件） |
+| Zenn topics/codex | codex | RSS | `https://zenn.dev/topics/codex/feed` | ✅確認済 |
+| はてブ検索「AI 導入」（導入事例系） | other | RSS | `https://b.hatena.ne.jp/q/AI%20%E5%B0%8E%E5%85%A5?mode=rss&sort=recent&target=title&users=1` | ✅確認済（40 件・当日分あり）。元記事直リンク + ブクマ数あり。**`target=title` と `users=1` の明示必須**（既定はタグ検索 + users=3）。D-034 |
+| はてブ検索「生成AI ビジネス」（ビジネス系） | other | RSS | `https://b.hatena.ne.jp/q/%E7%94%9F%E6%88%90AI%20%E3%83%93%E3%82%B8%E3%83%8D%E3%82%B9?mode=rss&sort=recent&target=text&users=1` | ✅確認済（40 件・当日分あり）。同上。クエリ語は運用しながら調整可 |
+| ITmedia AI+ | other | RSS | `https://rss.itmedia.co.jp/rss/2.0/aiplus.xml` | ✅確認済（20 件・全件 AI 関連）。**PR TIMES は却下**（全業種 firehose で絞り込み不能。D-033） |
+
+> **Google News RSS は不採用（D-034）**: リンクがリダイレクト URL で横断重複排除が効かない・人気指標なし・description が薄い・新規アダプタ実装が必要、の 4 点をはてブ検索が全て解消するため置き換えた。
+
+はてブの title/text 検索は検索マッチが緩く無関係記事が混ざりやすいため、**「広く取る × きつく濾す」をセット**とし、relevance.ts のキーワードフィルタ強化を前提条件とする。
 
 ### 5.2 クエリ別日次上限（SourceConfig）
 
@@ -134,8 +138,8 @@ interface SourceConfig {
 | Qiita ×3（ClaudeCode / Gemini / Codex） | 25 / 25 / 25 | **ストック数降順** |
 | Zenn ×3（claudecode / gemini / codex） | 各 20 | 新着順 |
 | はてブ検索「Claude Code」 | 15 | **ブクマ数降順** |
-| Google News ×2 | 各 25 | 新着順 |
-| PR TIMES / ITmedia | 15 | 新着順 |
+| はてブ検索 ×2（AI 導入 / 生成AI ビジネス） | 各 25 | **ブクマ数降順** |
+| ITmedia AI+ | 15 | 新着順 |
 
 **合計 約280 件/日**（500 RPD の約 56%）。
 
