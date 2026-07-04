@@ -145,7 +145,7 @@ Claude Code / Gemini の最新情報を YouTube や X など複数 SNS を巡回
 内容ベースで重要度を採点。破壊的変更/メジャーアップデート/広く影響する一次情報ほど高く、ニッチな小ネタは低く。**指標（Qiita ストック等）が無いソースも横断評価できる**よう、LLM 判定を主とする。
 
 ### 6.4 「今日の重要 TOP5」選定
-**当日（公開日が本日）の記事**を `importance_score` 降順で上位 5 件。同点時のタイブレークは、(1) Qiita はストック数、(2) GitHub Releases は新しさ、(3) それ以外は `published_at` の新しさ、の順で補助的に使う。
+**直近 24 時間に公開された記事**を `importance_score` 降順で上位 5 件。同点時のタイブレークは、(1) Qiita はストック数、(2) GitHub Releases は新しさ、(3) それ以外は `published_at` の新しさ、の順で補助的に使う。
 
 ### 6.5 採用 LLM とコスト
 - MVP: Gemini API 無料枠。**主に Flash（10 RPM / 250 RPD）を使う**（品質優先）。
@@ -172,7 +172,7 @@ Claude Code / Gemini の最新情報を YouTube や X など複数 SNS を巡回
 
 | 画面 | 内容 | 並び順 |
 |---|---|---|
-| 今日の重要 TOP5 | 当日（公開日が本日）の全プロダクト横断で重要度上位 5 件 | importance_score 降順 |
+| 今日の重要 TOP5 | 直近 24 時間に公開された全プロダクト横断で重要度上位 5 件 | importance_score 降順 |
 | 新機能・アップデート | `category = update` | published_at 降順 |
 | Tips（Claude Code） | `product = claude_code` かつ `category = tips` | published_at 降順 |
 | Tips（Gemini） | `product = gemini` かつ `category = tips` | published_at 降順 |
@@ -195,7 +195,7 @@ Claude Code / Gemini の最新情報を YouTube や X など複数 SNS を巡回
 ## 8. バッチ/インフラ仕様
 
 ### 8.1 収集ワークフロー（collect.yml）
-- トリガー: `schedule`（既定 1 日 1 回。例 07:00 JST = `cron: '0 22 * * *'` UTC）+ `workflow_dispatch`（手動実行）。
+- トリガー: `schedule`（既定 1 日 1 回。例 05:00 JST = `cron: '0 20 * * *'` UTC）+ `workflow_dispatch`（手動実行）。
 - 頻度変更は cron 式の変更のみ。重複排除（upsert）により頻度を上げても安全。
 - 注: GitHub Actions の `schedule` は指定時刻から数分〜十数分遅れて起動しうる（本用途では許容）。
 

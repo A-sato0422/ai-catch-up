@@ -68,14 +68,13 @@ export function useArticles(screen: Screen): UseArticlesResult {
 
       switch (screen) {
         case 'top5': {
-          // 今日（JST）の記事を重要度降順で最大 5 件取得
-          // JST = UTC+9 なので Date.now() に 9h を加えて ISO 文字列から日付部分を取得する
-          const todayJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-          const startOfDayJST = `${todayJST}T00:00:00+09:00`;
-          const endOfDayJST = `${todayJST}T23:59:59+09:00`;
+          // 直近24時間に公開された記事を重要度降順で最大5件取得
+          // バッチは1日1回のみ実行のため、暦日境界だと実行タイミング次第で新着が
+          // 「前日扱い」になり永久に表示されなくなる（D-023）。実行タイミング非依存にするため
+          // 暦日ではなくローリングウィンドウで判定する。
+          const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
           query = query
-            .gte('published_at', startOfDayJST)
-            .lte('published_at', endOfDayJST)
+            .gte('published_at', windowStart)
             .order('importance_score', { ascending: false })
             .limit(5);
           break;
