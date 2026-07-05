@@ -1,4 +1,4 @@
-import type { Screen, ScreenConfig, ScreenMeta } from '../types';
+import type { Screen, ScreenDisplayConfig, ScreenMeta } from '../types';
 
 // バックアップ用モックデータ。本番では使用しない（useArticles フックが DB から取得）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -217,7 +217,7 @@ export const DATA: Record<Screen, any[]> = {
   ],
 };
 
-export const SCREEN_CONFIG: Record<Screen, ScreenConfig> = {
+export const SCREEN_CONFIG: Record<Screen, ScreenDisplayConfig> = {
   top5:       { hasNumber: true,  hasSource: true,  chevron: true,  expand: true },
   update:     { hasBar: true, hasBrand: true, hasTag: true, external: true },
   tips:       { hasSource: true,  chevron: true,  expand: true },

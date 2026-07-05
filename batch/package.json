@@ -6,6 +6,7 @@
   "scripts": {
     "collect": "tsx src/collect.ts",
     "cleanup": "tsx src/cleanup.ts",
+    "summarize": "tsx src/summarize.ts",
     "test": "vitest run"
   },
   "devDependencies": {

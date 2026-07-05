@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import type { Article, ScreenConfig } from '../types';
+import type { Article, ScreenDisplayConfig } from '../types';
 import SourceBadge from './SourceBadge';
 
 interface Props {
   article: Article;
-  config: ScreenConfig;
+  config: ScreenDisplayConfig;
   index: number;
   isOpen: boolean;
   isFav: boolean;
   onToggleOpen: () => void;
-  onToggleFav: () => void;
+  onToggleFav: (article: Article) => void;
 }
 
 function StarIcon({ filled }: { filled: boolean }) {
@@ -208,16 +208,33 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
             {article.date}
           </span>
 
-          {/* Importance badge */}
+          {/* Importance badge — 理由があれば併記する（例「重要度 9 ｜ 破壊的変更」。SPEC_EXPANSION §7.6） */}
           <span style={{
             padding: '4px 10px', borderRadius: 8,
             background: 'var(--imp-bg)',
             fontSize: 12, fontWeight: 700, color: 'var(--imp-text)',
           }}>
-            重要度 {article.imp}
+            重要度 {article.imp}{article.importanceReason ? ` ｜ ${article.importanceReason}` : ''}
           </span>
 
         </div>
+
+        {/* Tag chips — LLM 出力の tags（2〜3個）を1行表示（欠損時は非表示。SPEC_EXPANSION §7.6） */}
+        {article.tags && article.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {article.tags.map(tag => (
+              <span key={tag} style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '2px 9px', borderRadius: 999,
+                background: 'var(--pill-bg)', border: '1px solid var(--pill-line)',
+                fontSize: 11, fontWeight: 600, color: 'var(--muted2)',
+                whiteSpace: 'nowrap',
+              }}>
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Actions column */}
@@ -228,7 +245,7 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
       }}>
         {/* Fav toggle */}
         <button
-          onClick={e => { e.stopPropagation(); onToggleFav(); }}
+          onClick={e => { e.stopPropagation(); onToggleFav(article); }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             width: 32, height: 32, borderRadius: 8,

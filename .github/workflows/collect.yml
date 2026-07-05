@@ -38,3 +38,14 @@ jobs:
           QIITA_TOKEN: ${{ secrets.QIITA_TOKEN }}
           LLM_PROVIDER: gemini
           BACKFILL_DAYS: ${{ github.event.inputs.backfill_days || '1' }}
+
+      - name: Run summarize
+        # summarize.ts 自体は内部で fail-soft しているが、念のため未知の例外で
+        # ワークフロー全体を落とさないよう continue-on-error にしておく（フェーズ E）。
+        run: npm run summarize
+        working-directory: batch
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

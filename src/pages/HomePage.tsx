@@ -2,11 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import lottie from 'lottie-web';
 import RobotSaludando from '../assets/lottie/RobotSaludando.json';
+import { ScreenIconGlyph } from '../components/ScreenIcon';
+import { getScreenGradient } from '../lib/screenGradients';
+import { buildAllScreens } from '../lib/screens';
+import { loadButtonSelection } from '../lib/buttonSettings';
+import { fetchDailySummary, FALLBACK_SUMMARY } from '../lib/dailySummary';
 
-const ICON_COLOR = 'var(--muted)';
-const FULL_TEXT = 'おはよう。今日は重要な記事が3件。\nClaude Code に破壊的変更があるよ。';
 const BUBBLE_APPEAR_MS = 1100;
 const CHAR_INTERVAL_MS = 55;
+// ボタン出現アニメーションの基準ディレイ・刻み幅（ボタン数が可変になったため index から算出する）
+const NAV_ANIM_BASE_DELAY = 0.55;
+const NAV_ANIM_STEP = 0.1;
 
 function NavCircle({
   onClick, children, label, gradientFrom, gradientTo, animDelay,
@@ -72,62 +78,17 @@ function NavCircle({
   );
 }
 
-function FlameIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <path
-        d="M11 2C9.5 5 7 7.5 7 11.5C7 14.5 8.8 17 11 17C13.2 17 15 14.5 15 11.5C15 9.5 14.2 8 13 7C13 9 11.8 10.2 11 10.5C11 7.5 12 4.5 11 2Z"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function TrendIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <polyline
-        points="2,17 7,11 12,14 20,5"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-      />
-      <circle cx="7" cy="11" r="1.5" fill={ICON_COLOR} />
-      <circle cx="12" cy="14" r="1.5" fill={ICON_COLOR} />
-      <path d="M16 5h4v4" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function AILabel() {
-  return (
-    <span style={{ fontSize: 18, fontWeight: 900, color: ICON_COLOR, letterSpacing: '-0.04em' }}>AI</span>
-  );
-}
-
-function GeminiIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <path d="M11 2C11 2 14 7 14 11C14 15 11 20 11 20C11 20 8 15 8 11C8 7 11 2 11 2Z"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M2 11C2 11 7 8.5 11 8.5C15 8.5 20 11 20 11C20 11 15 13.5 11 13.5C7 13.5 2 11 2 11Z"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <path d="M11 19C11 19 2 13 2 7.5C2 5 4 3 6.5 3C8 3 9.4 3.8 10.3 5C10.7 5.6 11 5.6 11.7 5C12.6 3.8 14 3 15.5 3C18 3 20 5 20 7.5C20 13 11 19 11 19Z"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export default function HomePage() {
   const navigate = useNavigate();
   const robotRef = useRef<HTMLDivElement>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [showCursor, setShowCursor] = useState(false);
+  // ホームのボタン配列は設定（localStorage）から動的生成する（固定枠2 + 自由枠最大5。G-1）
+  const [screens] = useState(() => buildAllScreens(loadButtonSelection()));
+  // 吹き出しの一言サマリー（G-5・daily_summaries の当日行。D-032）。
+  // 取得完了までは null にしておき、完了後に文字送りアニメーションを開始する。
+  // サイズ確定用の非表示プレースホルダーはフォールバック文言で仮置きし、レイアウトの揺れを避ける。
+  const [summaryText, setSummaryText] = useState<string | null>(null);
 
   useEffect(() => {
     if (!robotRef.current) return;
@@ -141,14 +102,28 @@ export default function HomePage() {
     return () => anim.destroy();
   }, []);
 
+  // daily_summaries の当日行を取得する（G-5・D-032）。取得完了・失敗いずれもフォールバック文言に収束する
   useEffect(() => {
+    let cancelled = false;
+    fetchDailySummary().then(text => {
+      if (!cancelled) setSummaryText(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // サマリー取得が完了してから文字送りアニメーションを開始する
+  useEffect(() => {
+    if (summaryText === null) return;
+
     const startTimer = setTimeout(() => {
       setShowCursor(true);
       let i = 0;
       const ticker = setInterval(() => {
         i++;
-        setDisplayedText(FULL_TEXT.slice(0, i));
-        if (i >= FULL_TEXT.length) {
+        setDisplayedText(summaryText.slice(0, i));
+        if (i >= summaryText.length) {
           clearInterval(ticker);
           setTimeout(() => setShowCursor(false), 900);
         }
@@ -157,7 +132,7 @@ export default function HomePage() {
     }, BUBBLE_APPEAR_MS);
 
     return () => clearTimeout(startTimer);
-  }, []);
+  }, [summaryText]);
 
   return (
     <div style={{
@@ -218,7 +193,7 @@ export default function HomePage() {
                 pointerEvents: 'none',
                 whiteSpace: 'pre-wrap',
               }}>
-                {FULL_TEXT}
+                {summaryText ?? FALLBACK_SUMMARY}
               </span>
               <span style={{ gridArea: '1 / 1', whiteSpace: 'pre-wrap' }}>
                 {displayedText}
@@ -239,61 +214,28 @@ export default function HomePage() {
       {/* Gap between robot section and buttons */}
       <div style={{ flex: '0 0 clamp(64px, 9vw, 96px)' }} />
 
-      {/* Navigation buttons */}
+      {/* Navigation buttons — 統合画面リスト（TOP5 固定 → 自由枠最大5 → お気に入り固定）から動的生成 */}
       <div style={{
         display: 'flex', flexWrap: 'wrap',
         gap: 'clamp(12px, 2.5vw, 24px)',
         justifyContent: 'center', alignItems: 'center',
       }}>
-        <NavCircle
-          onClick={() => navigate('/top5')}
-          label="TODAY TOP5"
-          gradientFrom="#ff8a45"
-          gradientTo="#ff4d28"
-          animDelay="0.55s"
-        >
-          <FlameIcon />
-        </NavCircle>
-
-        <NavCircle
-          onClick={() => navigate('/update')}
-          label="アップデート"
-          gradientFrom="#fbbf24"
-          gradientTo="#f59e0b"
-          animDelay="0.65s"
-        >
-          <TrendIcon />
-        </NavCircle>
-
-        <NavCircle
-          onClick={() => navigate('/tips')}
-          label="Tips (Claude)"
-          gradientFrom="#34d399"
-          gradientTo="#059669"
-          animDelay="0.75s"
-        >
-          <AILabel />
-        </NavCircle>
-
-        <NavCircle
-          onClick={() => navigate('/tips-gemini')}
-          label="Tips (Gemini)"
-          gradientFrom="#4285f4"
-          gradientTo="#0ea5e9"
-          animDelay="0.85s"
-        >
-          <GeminiIcon />
-        </NavCircle>
-
-        <NavCircle
-          onClick={() => navigate('/fav')}
-          label="お気に入り"
-          gradientFrom="#f43f5e"
-          gradientTo="#ec4899"
-          animDelay="0.95s"
-        >
-          <HeartIcon />
-        </NavCircle>
+        {screens.map((screen, i) => {
+          const [gradientFrom, gradientTo] = getScreenGradient(screen.icon);
+          const path = screen.special ? `/${screen.id}` : `/screen/${screen.id}`;
+          return (
+            <NavCircle
+              key={screen.id}
+              onClick={() => navigate(path)}
+              label={screen.label}
+              gradientFrom={gradientFrom}
+              gradientTo={gradientTo}
+              animDelay={`${NAV_ANIM_BASE_DELAY + i * NAV_ANIM_STEP}s`}
+            >
+              <ScreenIconGlyph kind={screen.icon} size={22} />
+            </NavCircle>
+          );
+        })}
       </div>
 
       <div style={{ flex: 3 }} />

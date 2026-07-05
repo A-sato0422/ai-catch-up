@@ -9,48 +9,12 @@ import {
   loadButtonSelection,
   saveButtonSelection,
 } from '../lib/buttonSettings';
-import type { ButtonSelection, GroupIcon } from '../lib/buttonSettings';
-
-// アイコン SVG はデザイン正本（Button Settings.dc.html）からコピー
-function GroupIconSvg({ icon }: { icon: GroupIcon }) {
-  switch (icon) {
-    case 'gemini':
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <path d="M12 1.5c.7 5 3.5 7.8 8.5 8.5-5 .7-7.8 3.5-8.5 8.5-.7-5-3.5-7.8-8.5-8.5C8.5 9.3 11.3 6.5 12 1.5z" fill="#2f6df0" />
-        </svg>
-      );
-    case 'claude':
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <path d="M12 1.5c.7 5 3.5 7.8 8.5 8.5-5 .7-7.8 3.5-8.5 8.5-.7-5-3.5-7.8-8.5-8.5C8.5 9.3 11.3 6.5 12 1.5z" fill="#ff5a2c" />
-        </svg>
-      );
-    case 'codex':
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9.5" stroke="#10a37f" strokeWidth="1.9" />
-          <path d="M9 9l-3 3 3 3M15 9l3 3-3 3" stroke="#10a37f" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    case 'office':
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22a06b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 21h18" />
-          <path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
-          <path d="M15 9h2a2 2 0 0 1 2 2v10" />
-          <path d="M9 7h2M9 11h2M9 15h2" />
-        </svg>
-      );
-    case 'exec':
-      return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 3v18h18" />
-          <path d="M7 14l4-4 3 3 5-6" />
-        </svg>
-      );
-  }
-}
+import type { ButtonSelection } from '../lib/buttonSettings';
+// アイコン SVG は HomePage / BottomNav と共有するため src/components/GroupIcon.tsx へ抽出済み（G-1）
+import GroupIconSvg from '../components/GroupIcon';
+// G-2 残タスク: 属性の再選択導線（G-3 の AttributePopup を設定画面からモーダルとして再利用）
+import AttributePopup from '../components/AttributePopup';
+import { presetForAttribute, type AttributeId } from '../lib/attributePresets';
 
 function TitleIcon() {
   return (
@@ -150,6 +114,8 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   // ページ内 state で編集し、「保存する」で初めて localStorage に書き込む
   const [selection, setSelection] = useState<ButtonSelection>(() => loadButtonSelection());
+  // G-2 残タスク: 属性の再選択導線（G-3 の AttributePopup を設定画面からモーダルとして再利用）
+  const [showAttributePopup, setShowAttributePopup] = useState(false);
 
   const count = countSelectedButtons(selection);
   const atLimit = count >= MAX_CUSTOM_BUTTONS;
@@ -170,6 +136,15 @@ export default function SettingsPage() {
 
   const handleCancel = () => {
     navigate('/');
+  };
+
+  // 属性プリセットの適用は一括操作のため「その場で確定」とする（保存する ボタンを待たない）。
+  // localStorage への保存とページ内 state の両方を即時更新し、チェックボックス群に反映する。
+  const handleAttributeSelect = (attribute: AttributeId) => {
+    const preset = presetForAttribute(attribute);
+    saveButtonSelection(preset);
+    setSelection(preset);
+    setShowAttributePopup(false);
   };
 
   const sidePad = 'clamp(20px, 4vw, 42px)';
@@ -193,8 +168,30 @@ export default function SettingsPage() {
             表示するボタンを選ぶ
           </h1>
         </div>
-        <div className="ml-0 sm:ml-14" style={{ marginTop: 6, color: 'var(--muted)', fontSize: 14.5 }}>
-          最大5つまで選べます（TOP5・お気に入りは常に表示）
+        <div
+          className="ml-0 sm:ml-14"
+          style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}
+        >
+          <span style={{ color: 'var(--muted)', fontSize: 14.5 }}>
+            最大5つまで選べます（TOP5・お気に入りは常に表示）
+          </span>
+          <button
+            onClick={() => setShowAttributePopup(true)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: '#ff5a2c',
+              fontSize: 13.5,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              padding: 0,
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+            }}
+          >
+            属性から選び直す
+          </button>
         </div>
       </div>
 
@@ -340,6 +337,13 @@ export default function SettingsPage() {
           保存する
         </button>
       </div>
+
+      {showAttributePopup && (
+        <AttributePopup
+          onSelect={handleAttributeSelect}
+          onClose={() => setShowAttributePopup(false)}
+        />
+      )}
     </div>
   );
 }
