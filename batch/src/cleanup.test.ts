@@ -8,9 +8,7 @@ vi.mock('./lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(() => ({
       delete: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          lt: mockDelete,
-        })),
+        lt: mockDelete,
       })),
     })),
   },
@@ -21,7 +19,7 @@ import { cleanup } from './cleanup.js';
 describe('cleanup', () => {
   beforeEach(() => mockDelete.mockReset());
 
-  it('is_favorite=false かつ published_at が古い記事を削除する', async () => {
+  it('is_favorite に関係なく published_at が古い記事を削除する', async () => {
     mockDelete.mockResolvedValue({ error: null, count: 5 });
 
     await cleanup(30);

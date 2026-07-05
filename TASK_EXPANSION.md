@@ -8,9 +8,9 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 
 ## Current State（現在地）
 
-- フェーズ: **機能拡張の要件確定済み / 実装 未着手**
+- フェーズ: **フェーズ A 完了（2026-07-05） / フェーズ B 未着手**
 - 事前確認: URL 系 5 件は確認済み（2026-07-04。D-033）。残りはユーザー作業 2 件（AI Studio レート制限の実測確認 / Slack Webhook 発行）のみで、いずれも実装と並行可能（Slack はフェーズ F までに必要）
-- 次にやること: フェーズ A（スキーマ・型の拡張）
+- 次にやること: フェーズ B（LLM プロンプト拡張）
 - 前提: LLM は Gemini 3.1 Flash-Lite（15 RPM / 500 RPD）。日次収集上限 合計約 280 件 + サマリー 1 コール
 
 ---
@@ -27,13 +27,13 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 - [ ] **AI Studio でプロジェクトの実測レート制限を確認** … Flash-Lite が 15 RPM / 500 RPD であることを確認（枠は予告なく変動するため）※ユーザー作業
 - [ ] **Slack アプリ作成 + Incoming Webhook URL 発行** … 現行の Slack app 方式で作成（Legacy Custom Integration は使わない）※ユーザー作業
 
-## フェーズ A: スキーマ・型の拡張（他フェーズの土台）
+## フェーズ A: スキーマ・型の拡張（他フェーズの土台）【完了 2026-07-05】
 
-- [ ] `articles` にカラム追加: `audience` / `difficulty` / `importance_reason` / `tags` / `popularity`
-- [ ] `daily_summaries` テーブル新設（date PK / summary_ja / created_at）
-- [ ] 型定義の拡張: `Product` に `codex`、`Category` に `business` / `case_study`、`Enrichment` に新 4 フィールド、`RawArticle` に `popularity?`
-- [ ] `SourceConfig` 型の新設（adapter / dailyLimit / rank?）
-- [ ] cleanup.ts の条件変更: `is_favorite` 参照を削除し「published_at が 30 日超は全削除」に単純化
+- [x] `articles` にカラム追加: `audience` / `difficulty` / `importance_reason` / `tags` / `popularity`（`supabase/migrations/003_expand_schema.sql`）
+- [x] `daily_summaries` テーブル新設（date PK / summary_ja / created_at）（同上）
+- [x] 型定義の拡張: `Product` に `codex`、`Category` に `business` / `case_study`、`Enrichment` に新 4 フィールド、`RawArticle` に `popularity?`（`batch/src/types.ts`）
+- [x] `SourceConfig` 型の新設（adapter / dailyLimit / rank?）（同上）
+- [x] cleanup.ts の条件変更: `is_favorite` 参照を削除し「published_at が 30 日超は全削除」に単純化
 
 ## フェーズ B: LLM プロンプト拡張
 
