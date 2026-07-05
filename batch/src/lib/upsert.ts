@@ -21,6 +21,11 @@ export async function upsertArticle(article: ArticleInsert): Promise<void> {
       summary_ja: article.summaryJa,
       category: article.category,
       importance_score: article.importanceScore,
+      importance_reason: article.importanceReason,
+      tags: article.tags,
+      audience: article.audience,
+      difficulty: article.difficulty,
+      popularity: article.popularity,
       llm_provider: article.llmProvider,
     },
     // 既存 URL はスキップ（update しない）。CLAUDE.md §3.3

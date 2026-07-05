@@ -4,8 +4,10 @@ import type { SourceAdapter, RawArticle, Product } from '../types.js';
 const parser = new Parser();
 const EXCERPT_MAX = 3000;
 
-// gemini-cli は nightly/preview ビルドが多数混入するため安定版のみ通す（SPEC §3 備考）
-function isStableRelease(title: string): boolean {
+// gemini-cli / openai-codex は nightly/alpha/beta/preview/rc ビルドが多数混入するため
+// 安定版のみ通す（SPEC §3 備考 / SPEC_EXPANSION §5.1）。
+// openai/codex のタグは `rust-vX.Y.Z-alpha.N` 形式で alpha が多数流れるため、この判定を再利用する。
+export function isStableRelease(title: string): boolean {
   return !/nightly|alpha|beta|preview|rc\d*|\.dev\./i.test(title);
 }
 
@@ -44,5 +46,12 @@ export const githubReleasesGeminiCli = makeGithubReleasesAdapter({
   id: 'github_gemini_cli',
   url: 'https://github.com/google-gemini/gemini-cli/releases.atom',
   product: 'gemini',
+  filterTitle: isStableRelease,
+});
+
+export const githubReleasesCodex = makeGithubReleasesAdapter({
+  id: 'github_codex',
+  url: 'https://github.com/openai/codex/releases.atom',
+  product: 'codex',
   filterTitle: isStableRelease,
 });

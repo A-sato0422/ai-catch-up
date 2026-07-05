@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockParseURL } = vi.hoisted(() => ({ mockParseURL: vi.fn() }));
 vi.mock('rss-parser', () => ({ default: class { parseURL = mockParseURL; } }));
 
-import { zennClaudeCode, zennGemini } from './zenn.js';
+import { zennClaudeCode, zennGemini, zennCodex } from './zenn.js';
 
 const mockItem = {
   title: 'Claude Code で CI を自動化した',
@@ -47,5 +47,18 @@ describe('zennGemini', () => {
     const articles = await zennGemini.fetch();
     expect(articles[0].product).toBe('gemini');
     expect(mockParseURL).toHaveBeenCalledWith('https://zenn.dev/topics/gemini/feed');
+  });
+});
+
+describe('zennCodex', () => {
+  beforeEach(() => mockParseURL.mockReset());
+
+  it('codex トピック URL を使い product が codex になる', async () => {
+    mockParseURL.mockResolvedValue({ items: [mockItem] });
+
+    const articles = await zennCodex.fetch();
+    expect(articles[0].product).toBe('codex');
+    expect(articles[0].source).toBe('zenn_codex');
+    expect(mockParseURL).toHaveBeenCalledWith('https://zenn.dev/topics/codex/feed');
   });
 });

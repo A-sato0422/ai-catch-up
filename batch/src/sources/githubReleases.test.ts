@@ -10,7 +10,7 @@ vi.mock('rss-parser', () => ({
   },
 }));
 
-import { githubReleasesClaudeCode, githubReleasesGeminiCli } from './githubReleases.js';
+import { githubReleasesClaudeCode, githubReleasesGeminiCli, githubReleasesCodex } from './githubReleases.js';
 
 const mockItem = {
   title: 'v2.1.177',
@@ -68,5 +68,40 @@ describe('githubReleasesGeminiCli', () => {
     const articles = await githubReleasesGeminiCli.fetch();
     expect(articles).toHaveLength(1);
     expect(articles[0].title).toBe('v1.0.0');
+  });
+});
+
+describe('githubReleasesCodex', () => {
+  beforeEach(() => mockParseURL.mockReset());
+
+  it('安定版リリースを通し product が codex になる', async () => {
+    mockParseURL.mockResolvedValue({
+      items: [{ ...mockItem, title: 'rust-v0.5.0', link: 'https://github.com/openai/codex/releases/tag/rust-v0.5.0' }],
+    });
+    const articles = await githubReleasesCodex.fetch();
+    expect(articles).toHaveLength(1);
+    expect(articles[0].product).toBe('codex');
+    expect(articles[0].source).toBe('github_codex');
+  });
+
+  it('openai/codex 特有の alpha ビルドタグ形式を除外する', async () => {
+    mockParseURL.mockResolvedValue({
+      items: [
+        { ...mockItem, title: 'rust-v0.5.0-alpha.1' },
+        { ...mockItem, title: 'rust-v0.5.0-alpha.12' },
+        { ...mockItem, title: 'rust-v0.5.0-beta.1' },
+        { ...mockItem, title: 'rust-v0.5.0-rc1' },
+        { ...mockItem, title: 'rust-v0.5.0' },
+      ],
+    });
+    const articles = await githubReleasesCodex.fetch();
+    expect(articles).toHaveLength(1);
+    expect(articles[0].title).toBe('rust-v0.5.0');
+  });
+
+  it('codex.atom URL を使う', async () => {
+    mockParseURL.mockResolvedValue({ items: [] });
+    await githubReleasesCodex.fetch();
+    expect(mockParseURL).toHaveBeenCalledWith('https://github.com/openai/codex/releases.atom');
   });
 });

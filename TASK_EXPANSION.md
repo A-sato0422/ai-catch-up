@@ -8,9 +8,10 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 
 ## Current State（現在地）
 
-- フェーズ: **フェーズ A 完了（2026-07-05） / フェーズ B 未着手**
+- フェーズ: **フェーズ A〜D 完了（2026-07-05） / フェーズ E 未着手**
 - 事前確認: URL 系 5 件は確認済み（2026-07-04。D-033）。残りはユーザー作業 2 件（AI Studio レート制限の実測確認 / Slack Webhook 発行）のみで、いずれも実装と並行可能（Slack はフェーズ F までに必要）
-- 次にやること: フェーズ B（LLM プロンプト拡張）
+- 次にやること: フェーズ E（一言サマリー生成）
+- 未実施の手動確認（実ネットワーク・実APIキーが必要なため自動化スキップ）: フェーズBの分類結果目視確認（5〜10件）、フェーズDの全クエリ取得件数・カット件数確認。運用開始前に実施すること
 - 前提: LLM は Gemini 3.1 Flash-Lite（15 RPM / 500 RPD）。日次収集上限 合計約 280 件 + サマリー 1 コール
 
 ---
@@ -35,32 +36,34 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 - [x] `SourceConfig` 型の新設（adapter / dailyLimit / rank?）（同上）
 - [x] cleanup.ts の条件変更: `is_favorite` 参照を削除し「published_at が 30 日超は全削除」に単純化
 
-## フェーズ B: LLM プロンプト拡張
+## フェーズ B: LLM プロンプト拡張【完了 2026-07-05】
 
-- [ ] 出力 JSON に `importance_reason` / `tags` / `audience` / `difficulty` を追加（SPEC_EXPANSION §4.1）
-- [ ] `category` の判定基準に `business` / `case_study` の定義を追記（§4.4）
-- [ ] `difficulty` の判定基準（1〜3）と具体例をプロンプトに明記（§4.3。迷ったら低い方に倒す）
-- [ ] JSON パースの拡張フィールド対応（欠損時のフォールバック: null で保存）
-- [ ] サンプル記事 5〜10 件で分類結果を目視確認（特に difficulty の揺れ）
+- [x] 出力 JSON に `importance_reason` / `tags` / `audience` / `difficulty` を追加（SPEC_EXPANSION §4.1）
+- [x] `category` の判定基準に `business` / `case_study` の定義を追記（§4.4）
+- [x] `difficulty` の判定基準（1〜3）と具体例をプロンプトに明記（§4.3。迷ったら低い方に倒す）
+- [x] JSON パースの拡張フィールド対応（欠損時のフォールバック: null で保存）
+- [~] サンプル記事 5〜10 件で分類結果を目視確認（特に difficulty の揺れ）— 実 API 呼び出しが必要なため未実施。運用開始後に確認する
+- [x] `batch/src/lib/upsert.ts` に `audience` / `difficulty` / `importance_reason` / `tags` の保存を追加（現状は Enrichment を列ごと手動マッピングしており、このままだと LLM が出力しても DB に保存されず捨てられるため）
 
-## フェーズ C: 収集パイプラインの上限・rank 対応
+## フェーズ C: 収集パイプラインの上限・rank 対応【完了 2026-07-05】
 
-- [ ] `sources/index.ts` を `SourceConfig[]` に変更し、全クエリに `dailyLimit` を設定（§5.2 の表の値）
-- [ ] collect.ts: fetch 後・enrich 前に dailyLimit で件数カット（rank 指定があればソートしてから）
-- [ ] Qiita アダプタ: `popularity`（ストック数）を埋める + rank 関数（ストック数降順）
-- [ ] はてブ アダプタ: `popularity`（`hatena:bookmarkcount`）を埋める + rank 関数（ブクマ数降順）
-- [ ] RPM 制御を 4 秒間隔に調整（15 RPM 内）
-- [ ] **クエリ別のカット件数をログ出力**（どのクエリの上限を次に広げるか判断するため）
+- [x] `sources/index.ts` を `SourceConfig[]` に変更し、全クエリに `dailyLimit` を設定（§5.2 の表の値。`hatenaGemini` は表に明記が無かったため `hatenaClaudeCode` と対称に dailyLimit=15・ブクマ数降順としている）
+- [x] collect.ts: fetch 後・enrich 前に dailyLimit で件数カット（rank 指定があればソートしてから）
+- [x] Qiita アダプタ: `popularity`（ストック数）を埋める + rank 関数（ストック数降順）
+- [x] はてブ アダプタ: `popularity`（`hatena:bookmarkcount`）を埋める + rank 関数（ブクマ数降順）
+- [x] RPM 制御を 4 秒間隔に調整（15 RPM 内）
+- [x] **クエリ別のカット件数をログ出力**（どのクエリの上限を次に広げるか判断するため）
+- [x] `batch/src/lib/upsert.ts` に `popularity` の保存を追加（フェーズBで追加した4項目と合わせて Enrichment/RawArticle 由来の新カラムが揃う）
 
-## フェーズ D: 新ソースアダプタ
+## フェーズ D: 新ソースアダプタ【完了 2026-07-05】
 
-- [ ] `githubReleases`（openai/codex）… `https://github.com/openai/codex/releases.atom` で追加、登録配列に 1 行。**alpha/beta/rc ビルドの除外フィルタ必須**
-- [ ] `qiita` に Codex タグのクエリを追加（`query=tag:codex`）
-- [ ] `zenn` に codex トピックのクエリを追加（`https://zenn.dev/topics/codex/feed`）
-- [ ] `hatena` に検索クエリ 2 本を追加（D-034）: 「AI 導入」（`target=title&users=1`）/「生成AI ビジネス」（`target=text&users=1`）。新規アダプタ実装は不要（既存 hatena アダプタのクエリパラメータ化で対応）
-- [ ] `itmedia` アダプタ新規実装（`https://rss.itmedia.co.jp/rss/2.0/aiplus.xml`）
-- [ ] relevance.ts の強化: はてブ title/text 検索 / ITmedia 系用のキーワードフィルタ（「広く取る × きつく濾す」）
-- [ ] ローカル実行で全クエリの取得件数・カット件数を確認
+- [x] `githubReleases`（openai/codex）… `https://github.com/openai/codex/releases.atom` で追加、登録配列に 1 行。**alpha/beta/rc ビルドの除外フィルタ必須**
+- [x] `qiita` に Codex タグのクエリを追加（`query=tag:codex`）
+- [x] `zenn` に codex トピックのクエリを追加（`https://zenn.dev/topics/codex/feed`）
+- [x] `hatena` に検索クエリ 2 本を追加（D-034）: 「AI 導入」（`target=title&users=1`）/「生成AI ビジネス」（`target=text&users=1`）。新規アダプタ実装は不要（既存 hatena アダプタのクエリパラメータ化で対応）
+- [x] `itmedia` アダプタ新規実装（`https://rss.itmedia.co.jp/rss/2.0/aiplus.xml`）
+- [x] relevance.ts の強化: はてブ title/text 検索 / ITmedia 系用のキーワードフィルタ（「広く取る × きつく濾す」）。`isRelevantToAI`（広め共通判定）+ `isRelevantToAiAdoption`/`isRelevantToAiBusiness`（現状は同一ロジックだが将来の個別調整に備えて分離）
+- [~] ローカル実行で全クエリの取得件数・カット件数を確認 — 実ネットワーク呼び出しが必要なため未実施。単体テストでロジック検証済み。運用開始後に確認する
 
 ## フェーズ E: 一言サマリー（吹き出し）生成
 

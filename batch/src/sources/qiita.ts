@@ -11,6 +11,7 @@ interface QiitaItem {
   body: string;
   created_at: string;
   user?: { id: string };
+  stocks_count?: number; // ストック数。rank 用の popularity にマッピングする（SPEC_EXPANSION §5.2）
 }
 
 function makeQiitaAdapter(params: {
@@ -39,6 +40,7 @@ function makeQiitaAdapter(params: {
         excerpt: item.body?.slice(0, EXCERPT_MAX),
         author: item.user?.id,
         publishedAt: item.created_at,
+        popularity: item.stocks_count,
       }));
     },
   };
@@ -54,4 +56,10 @@ export const qiitaGemini = makeQiitaAdapter({
   id: 'qiita_gemini',
   tag: 'Gemini',
   product: 'gemini',
+});
+
+export const qiitaCodex = makeQiitaAdapter({
+  id: 'qiita_codex',
+  tag: 'codex',
+  product: 'codex',
 });

@@ -96,6 +96,93 @@ describe('GeminiProvider', () => {
     expect(result.category).toBe('tips');
   });
 
+  it('business / case_study の category を正しくパースする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"business","importance_score":5}'
+    ));
+    const business = await provider.enrich(baseArticle);
+    expect(business.category).toBe('business');
+
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"case_study","importance_score":5}'
+    ));
+    const caseStudy = await provider.enrich(baseArticle);
+    expect(caseStudy.category).toBe('case_study');
+  });
+
+  it('拡張フィールド（importance_reason / tags / audience / difficulty）を正しくパースする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"update","importance_score":8,"importance_reason":"破壊的変更","tags":["Claude Code","CI"],"audience":"engineer","difficulty":3}'
+    ));
+
+    const result = await provider.enrich(baseArticle);
+
+    expect(result.importanceReason).toBe('破壊的変更');
+    expect(result.tags).toEqual(['Claude Code', 'CI']);
+    expect(result.audience).toBe('engineer');
+    expect(result.difficulty).toBe(3);
+  });
+
+  it('拡張フィールドが欠損している場合は undefined にフォールバックする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5}'
+    ));
+
+    const result = await provider.enrich(baseArticle);
+
+    expect(result.importanceReason).toBeUndefined();
+    expect(result.tags).toBeUndefined();
+    expect(result.audience).toBeUndefined();
+    expect(result.difficulty).toBeUndefined();
+  });
+
+  it('拡張フィールドの型が不正な場合は無視して undefined にする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5,"importance_reason":123,"tags":"not-an-array","audience":"unknown_audience","difficulty":"high"}'
+    ));
+
+    const result = await provider.enrich(baseArticle);
+
+    expect(result.importanceReason).toBeUndefined();
+    expect(result.tags).toBeUndefined();
+    expect(result.audience).toBeUndefined();
+    expect(result.difficulty).toBeUndefined();
+  });
+
+  it('tags の要素に文字列以外が混ざる場合は文字列のみ残す', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5,"tags":["有効なタグ",123,null,"もう一つ"]}'
+    ));
+
+    const result = await provider.enrich(baseArticle);
+    expect(result.tags).toEqual(['有効なタグ', 'もう一つ']);
+  });
+
+  it('difficulty が範囲外（1〜3 以外）の場合は undefined にする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5,"difficulty":0}'
+    ));
+    const tooLow = await provider.enrich(baseArticle);
+    expect(tooLow.difficulty).toBeUndefined();
+
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5,"difficulty":4}'
+    ));
+    const tooHigh = await provider.enrich(baseArticle);
+    expect(tooHigh.difficulty).toBeUndefined();
+  });
+
+  it('JSON パース失敗時は拡張フィールドも含めてデフォルト値でフォールバックする', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse('これはJSONではありません'));
+
+    const result = await provider.enrich(baseArticle);
+
+    expect(result.importanceReason).toBeUndefined();
+    expect(result.tags).toBeUndefined();
+    expect(result.audience).toBeUndefined();
+    expect(result.difficulty).toBeUndefined();
+  });
+
   it('excerpt を 3000 文字に打ち切ってから LLM に渡す', async () => {
     mockGenerateContent.mockResolvedValue(makeResponse(
       '{"summary_ja":"要約","category":"tips","importance_score":5}'

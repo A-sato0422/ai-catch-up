@@ -38,3 +38,9 @@ export const zennGemini = makeZennAdapter({
   topic: 'gemini',
   product: 'gemini',
 });
+
+export const zennCodex = makeZennAdapter({
+  id: 'zenn_codex',
+  topic: 'codex',
+  product: 'codex',
+});

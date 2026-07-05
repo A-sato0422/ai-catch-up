@@ -1,6 +1,6 @@
 import './env.js';
 import { fileURLToPath } from 'url';
-import { sources } from './sources/index.js';
+import { sourceConfigs } from './sources/index.js';
 import { createLLMProvider } from './llm/index.js';
 import { normalizeUrl } from './lib/normalizeUrl.js';
 import { upsertArticle } from './lib/upsert.js';
@@ -19,14 +19,23 @@ export async function collect(backfillDays = 1): Promise<void> {
   const llmProviderName = process.env.LLM_PROVIDER ?? 'gemini';
   const rawArticles: RawArticle[] = [];
 
-  // ソースごとに fetch（fail-soft: 1 ソースの失敗で全体を止めない。CLAUDE.md §4）
-  for (const source of sources) {
+  // ソース（クエリ）ごとに fetch（fail-soft: 1 ソースの失敗で全体を止めない。CLAUDE.md §4）
+  // クエリ単位の dailyLimit カットは、URL 正規化・重複排除・backfill・DB 既存チェックより前に行う
+  // （生データに対してクエリ単位の上限を適用する趣旨のため。SPEC_EXPANSION §5.2 / D-031）。
+  for (const config of sourceConfigs) {
     try {
-      const articles = await source.fetch();
-      console.log(`[${source.id}] fetched ${articles.length}`);
-      rawArticles.push(...articles);
+      const articles = await config.adapter.fetch();
+      const sorted = [...articles].sort(
+        config.rank ?? ((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      );
+      const kept = sorted.slice(0, config.dailyLimit);
+      const cut = articles.length - kept.length;
+      console.log(
+        `[${config.adapter.id}] fetched ${articles.length}, cut to dailyLimit ${config.dailyLimit} (${cut} cut)`
+      );
+      rawArticles.push(...kept);
     } catch (err) {
-      console.error(`[${source.id}] fetch failed:`, err);
+      console.error(`[${config.adapter.id}] fetch failed:`, err);
     }
   }
 
