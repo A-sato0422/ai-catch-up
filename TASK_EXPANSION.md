@@ -8,9 +8,9 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 
 ## Current State（現在地）
 
-- フェーズ: **フェーズ A〜E・G 完了（2026-07-05） / フェーズ F（Slack通知）は Slack app 未作成のため保留**
-- 事前確認: URL 系 5 件は確認済み（2026-07-04。D-033）。残りはユーザー作業 2 件（AI Studio レート制限の実測確認 / Slack Webhook 発行）のみ
-- 次にやること: フェーズ F（Slack Webhook 発行後に着手）。フェーズ H（仕上げ）は F 完了後に残タスクを確認
+- フェーズ: **フェーズ A〜G 完了（F は 2026-07-07 完了）**
+- 事前確認: URL 系 5 件は確認済み（2026-07-04。D-033）。Slack Webhook は発行・Secrets 登録済み。残りはユーザー作業 1 件（AI Studio レート制限の実測確認）のみ
+- 次にやること: フェーズ H（仕上げ）。全体疎通（Slack 実 Webhook への通知確認を含む）・SPEC.md への反映・README 更新など
 - 未実施の手動確認（実ネットワーク・実APIキーが必要なため自動化スキップ）: フェーズBの分類結果目視確認（5〜10件）、フェーズDの全クエリ取得件数・カット件数確認。運用開始前に実施すること
 - 適用が必要な新規マイグレーション（ユーザー側の作業）: `003_expand_schema.sql`（フェーズA）・`004_remove_anon_update.sql`（フェーズG-4。anonのUPDATE権限を撤去するRLS修正）
 - G-5 に要フォローアップタスクあり（TOP5 カテゴリ絞り込みの実データ確認。次回バッチ実行後に実施。詳細は G-5 セクション参照）
@@ -28,7 +28,7 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 - [x] ~~**Google News RSS 検索 URL**~~ … 確認の結果、**不採用に変更（D-034）**。リダイレクト URL で横断重複排除が効かない・人気指標なし・description が薄い・新規アダプタ実装が必要、の 4 点が理由。代替として**はてブ検索 RSS 2 本**を採用: 「AI 導入」（`target=title`）/「生成AI ビジネス」（`target=text`）、いずれも `users=1`・UTF-8 %エンコード・各 40 件返却を実測確認済み。**既定（タグ検索 + users=3）のままだとほぼヒットしないため `target` と `users` の明示が必須**
 - [x] **PR TIMES または ITmedia AI+ の RSS URL** … **ITmedia AI+ を採用**: `https://rss.itmedia.co.jp/rss/2.0/aiplus.xml` ✅20 件・全件 AI 関連・元記事 URL 直リンク・pubDate JST。PR TIMES は却下（`index.rdf` は全業種プレスリリースの firehose で AI 専門フィードが無い。D-033）
 - [ ] **AI Studio でプロジェクトの実測レート制限を確認** … Flash-Lite が 15 RPM / 500 RPD であることを確認（枠は予告なく変動するため）※ユーザー作業
-- [ ] **Slack アプリ作成 + Incoming Webhook URL 発行** … 現行の Slack app 方式で作成（Legacy Custom Integration は使わない）※ユーザー作業
+- [x] **Slack アプリ作成 + Incoming Webhook URL 発行** … 発行済み・GitHub Actions Secrets に `SLACK_WEBHOOK_URL` 登録済み（2026-07-07 確認）
 
 ## フェーズ A: スキーマ・型の拡張（他フェーズの土台）【完了 2026-07-05】
 
@@ -74,12 +74,12 @@ MVP リリース後の機能拡張のタスク管理。仕様の正典は `SPEC_
 - [x] collect.yml の最終ステップに組み込み（enrich 完了後）
 - [x] 記事 0 件の日の挙動を確認（生成スキップ or 定型文）→ フォールバック定型文採用
 
-## フェーズ F: Slack 通知
+## フェーズ F: Slack 通知【完了 2026-07-07】
 
-- [ ] Secrets に `SLACK_WEBHOOK_URL` を登録
-- [ ] `batch/src/notify.ts`: 当日 TOP5 + `daily_summaries.summary_ja` を Block Kit 形式で POST
-- [ ] collect.yml の最終ステップに組み込み（サマリー生成の後）
-- [ ] fail-soft: 通知失敗が collect 全体を落とさないことを確認
+- [x] Secrets に `SLACK_WEBHOOK_URL` を登録（ユーザー作業。登録済み）
+- [x] `batch/src/notify.ts`: 当日 TOP5 + `daily_summaries.summary_ja` を Block Kit 形式で POST（TOP5 定義は summarize.ts と同一の直近24時間・importance_score 降順。LLM コールなし。記事 0 件の日は「静かだった」旨の本文で投稿）
+- [x] collect.yml の最終ステップに組み込み（サマリー生成の後。summarize と同じ流儀で `continue-on-error: true`）
+- [x] fail-soft: 通知失敗が collect 全体を落とさないことを確認 — **ユニットテストで検証済み**（SLACK_WEBHOOK_URL 未設定 / TOP5 取得失敗 / daily_summaries 取得失敗 / POST reject / 非2xx 応答の 5 ケースすべてで例外を投げず正常終了。`batch/src/notify.test.ts`）。実 Webhook への疎通確認はフェーズ H の全体疎通で実施すること
 
 ## フェーズ G: フロントエンド
 

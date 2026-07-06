@@ -7,6 +7,7 @@
     "collect": "tsx src/collect.ts",
     "cleanup": "tsx src/cleanup.ts",
     "summarize": "tsx src/summarize.ts",
+    "notify": "tsx src/notify.ts",
     "test": "vitest run"
   },
   "devDependencies": {
