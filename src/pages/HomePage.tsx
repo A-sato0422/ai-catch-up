@@ -90,6 +90,11 @@ export default function HomePage() {
   // サイズ確定用の非表示プレースホルダーはフォールバック文言で仮置きし、レイアウトの揺れを避ける。
   const [summaryText, setSummaryText] = useState<string | null>(null);
 
+  // krobo ロゴの CSS アニメーションを lottie の再生開始と同じタイミングで始めるためのフラグ。
+  // マウント時点で CSS アニメーションを開始すると lottie（useEffect 内で開始）と最大1フレームずれるため、
+  // 同じ effect 内で立てて両者のタイムラインの起点を揃える。
+  const [robotStarted, setRobotStarted] = useState(false);
+
   useEffect(() => {
     if (!robotRef.current) return;
     const anim = lottie.loadAnimation({
@@ -99,6 +104,7 @@ export default function HomePage() {
       autoplay: true,
       animationData: RobotSaludando,
     });
+    setRobotStarted(true);
     return () => anim.destroy();
   }, []);
 
@@ -153,15 +159,52 @@ export default function HomePage() {
           width: '100%', maxWidth: 700,
         }}
       >
-        {/* Robot Lottie animation */}
+        {/*
+          Robot Lottie animation + 「krobo」ロゴのオーバーレイ（フェーズJ）。
+          lottie-web が robotRef の innerHTML を完全に管理するため、ロゴを直接 DOM に挿し込むことはできない。
+          代わりに relative コンテナで robotRef に重ね、pointer-events: none の absolute な文字要素として置く。
+          上下運動は RobotSaludando.json の胴体レイヤーの position キーフレームを CSS keyframes（roboBob。
+          src/index.css）へそのまま写した値で、周期 6.46667 秒（194フレーム/30fps）・イージングも Lottie 側と
+          同一。振幅はキャンバス(800px)比のため描画幅 --robot-w を CSS 変数で共有して比例させる。
+          アニメーション開始は robotStarted（lottie 再生開始と同じ effect 内で立つ）まで遅らせ、起点を揃える。
+        */}
         <div
-          ref={robotRef}
           style={{
-            width: 'clamp(160px, 24vw, 260px)',
+            position: 'relative',
+            // width と roboBob の振幅計算（keyframes 内の calc）で同じ値を使うため CSS 変数で共有する
+            ['--robot-w' as string]: 'clamp(160px, 24vw, 260px)',
+            width: 'var(--robot-w)',
             flexShrink: 0,
             animation: 'fadeInUp 0.45s ease 0.25s both',
           }}
-        />
+        >
+          <div ref={robotRef} style={{ width: '100%' }} />
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '58%',
+              // roboBob 自身が translate(-50%,-50%) を含むため、ここでは初期値として同じ変換を指定しておく
+              // （アニメーション開始前のチラつき防止）。
+              transform: 'translate(-50%, -50%)',
+              fontFamily: "'Noto Sans JP', -apple-system, sans-serif",
+              fontWeight: 800,
+              fontSize: 'clamp(11px, 1.7vw, 15px)',
+              letterSpacing: '0.14em',
+              color: 'rgba(255, 255, 255, 0.6)',
+              textShadow: '0 1px 0 rgba(255,255,255,0.3), 0 -1px 1px rgba(0,0,0,0.5)',
+              mixBlendMode: 'overlay',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+              // イージングは keyframes 内で区間ごとに指定済みのため、ここは linear を基底にする
+              animation: robotStarted ? 'roboBob 6.46667s linear infinite' : 'none',
+            }}
+          >
+            krobo
+          </span>
+        </div>
 
         {/* Speech bubble — appears last */}
         <div
@@ -244,24 +287,26 @@ export default function HomePage() {
         })}
       </div>
 
-      {/* 設定画面への導線（フェーズI）。ボタン数が変わっても案内が埋もれないよう控えめなサイズで下に配置する */}
+      {/*
+        設定画面への導線（フェーズI・J-2で控えめな見た目に調整）。
+        目立ちすぎるという指摘のため、下線を外し・色を var(--muted)（より薄い）に・フォントサイズを
+        小さくして存在感を落とす（クリックできることは維持）。ボタン列との余白も広げて誤タップを防ぐ。
+      */}
       <button
         onClick={() => navigate('/settings')}
         style={{
-          marginTop: 16,
+          marginTop: 32,
           border: 'none',
           background: 'transparent',
           cursor: 'pointer',
-          color: 'var(--muted2)',
-          fontSize: 12.5,
-          fontWeight: 600,
+          color: 'var(--muted)',
+          fontSize: 11.5,
+          fontWeight: 500,
           fontFamily: 'inherit',
           padding: 4,
-          textDecoration: 'underline',
-          textUnderlineOffset: 3,
         }}
       >
-        ボタンをカスタマイズする
+        ボタンをカスタム
       </button>
 
       <div style={{ flex: 3 }} />
