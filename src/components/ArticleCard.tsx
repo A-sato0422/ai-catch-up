@@ -5,7 +5,6 @@ import SourceBadge from './SourceBadge';
 interface Props {
   article: Article;
   config: ScreenDisplayConfig;
-  index: number;
   isOpen: boolean;
   isFav: boolean;
   onToggleOpen: () => void;
@@ -54,7 +53,7 @@ function CalendarIcon() {
   );
 }
 
-export default function ArticleCard({ article, config, index, isOpen, isFav, onToggleOpen, onToggleFav }: Props) {
+export default function ArticleCard({ article, config, isOpen, isFav, onToggleOpen, onToggleFav }: Props) {
   const isClaude = article.claude !== false;
   const barColor = isClaude ? '#ff5a2c' : '#2f6df0';
   const displayText = article.full;
@@ -85,19 +84,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
         <span style={{ width: 5, flexShrink: 0, background: barColor }} />
       )}
 
-      {/* Number — desktop */}
-      {config.hasNumber && (
-        <div className="hidden lg:flex" style={{
-          width: 66, flexShrink: 0,
-          alignItems: 'flex-start', justifyContent: 'center',
-          paddingTop: 20,
-        }}>
-          <span style={{ fontSize: 34, fontWeight: 900, color: '#ff5a2c', lineHeight: 1 }}>
-            {index + 1}
-          </span>
-        </div>
-      )}
-
       {/* Brand column — desktop only (update screen) */}
       {config.hasBrand && (
         <div className="hidden lg:flex" style={{
@@ -123,15 +109,6 @@ export default function ArticleCard({ article, config, index, isOpen, isFav, onT
 
       {/* Main content */}
       <div style={{ flex: 1, minWidth: 0, padding: '18px 18px 18px 20px' }}>
-
-        {/* Mobile: number inline */}
-        {config.hasNumber && (
-          <span className="lg:hidden" style={{
-            fontSize: 18, fontWeight: 900, color: '#ff5a2c', marginRight: 6,
-          }}>
-            #{index + 1}
-          </span>
-        )}
 
         {/* Mobile: brand inline for update */}
         {config.hasBrand && (

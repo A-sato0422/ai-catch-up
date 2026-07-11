@@ -124,20 +124,37 @@ function ArticleListBody({ screenConfig, articles, loading, error, isFav, onTogg
           </div>
         )}
 
-        {!loading && !error && articles.map((article, i) => {
+        {!loading && !error && articles.map((article) => {
           const key = `${screenConfig.id}__${article.id}`;
-          return (
+          const card = (
             <ArticleCard
-              key={key}
               article={article}
               config={displayConfig}
-              index={i}
               isOpen={getOpen(key)}
               isFav={isFav(article.id)}
               onToggleOpen={() => toggleOpen(key)}
               onToggleFav={onToggleFav}
             />
           );
+
+          // 重要トピック画面はカードの外・上にグループ名をサブタイトルとして表示する
+          if (displayConfig.hasGroupLabel && article.groupLabel) {
+            return (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <span style={{
+                  paddingLeft: 4,
+                  fontSize: 13, fontWeight: 800,
+                  color: 'var(--muted2)',
+                  letterSpacing: '0.02em',
+                }}>
+                  {article.groupLabel}
+                </span>
+                {card}
+              </div>
+            );
+          }
+
+          return <div key={key}>{card}</div>;
         })}
       </div>
     </div>

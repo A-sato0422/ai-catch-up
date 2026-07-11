@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockGenerateContent, mockLimit, mockUpsert } = vi.hoisted(() => ({
+const { mockGenerateContent, mockSelectTopTopics, mockUpsert } = vi.hoisted(() => ({
   mockGenerateContent: vi.fn(),
-  mockLimit: vi.fn(),
+  mockSelectTopTopics: vi.fn(),
   mockUpsert: vi.fn(),
 }));
 
@@ -12,20 +12,15 @@ vi.mock('@google/generative-ai', () => ({
   },
 }));
 
+// 重要トピックの選定は lib/topTopics.ts（selectTopTopics）へ切り出したため直接モックする。
+// daily_summaries への upsert のみ supabase を使う。
+vi.mock('./lib/topTopics.js', () => ({
+  selectTopTopics: mockSelectTopTopics,
+}));
+
 vi.mock('./lib/supabase.js', () => ({
   supabase: {
     from: vi.fn((table: string) => {
-      if (table === 'articles') {
-        return {
-          select: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: mockLimit,
-              })),
-            })),
-          })),
-        };
-      }
       if (table === 'daily_summaries') {
         return { upsert: mockUpsert };
       }
@@ -44,7 +39,7 @@ describe('summarize', () => {
   beforeEach(() => {
     process.env.GEMINI_API_KEY = 'test-key';
     mockGenerateContent.mockReset();
-    mockLimit.mockReset();
+    mockSelectTopTopics.mockReset();
     mockUpsert.mockReset();
     mockUpsert.mockResolvedValue({ error: null });
   });
@@ -53,21 +48,18 @@ describe('summarize', () => {
     vi.useRealTimers();
   });
 
-  it('TOP5を取得しLLMでサマリーを生成してdate（JST）でupsertする', async () => {
-    mockLimit.mockResolvedValue({
-      data: [
-        { title: 'Claude Code 4.0 リリース', summary_ja: '破壊的変更あり' },
-        { title: 'Gemini 3.1 発表', summary_ja: '新機能追加' },
-      ],
-      error: null,
-    });
+  it('重要トピックを取得しLLMでサマリーを生成してdate（JST）でupsertする', async () => {
+    mockSelectTopTopics.mockResolvedValue([
+      { groupLabel: 'Claude Code', title: 'Claude Code 4.0 リリース', summary_ja: '破壊的変更あり' },
+      { groupLabel: 'Gemini', title: 'Gemini 3.1 発表', summary_ja: '新機能追加' },
+    ]);
     mockGenerateContent.mockResolvedValue(
       makeResponse('今日はClaude Codeに破壊的変更があったよ。要チェック！')
     );
 
     await summarize();
 
-    // LLM には TOP5 のタイトル + 要約が渡っている
+    // LLM には重要トピックのタイトル + 要約が渡っている
     const [promptArg] = mockGenerateContent.mock.calls[0];
     expect(promptArg).toContain('Claude Code 4.0 リリース');
     expect(promptArg).toContain('破壊的変更あり');
@@ -81,7 +73,7 @@ describe('summarize', () => {
   });
 
   it('記事0件のときLLMを呼ばずフォールバック文言をupsertする', async () => {
-    mockLimit.mockResolvedValue({ data: [], error: null });
+    mockSelectTopTopics.mockResolvedValue([]);
 
     await summarize();
 
@@ -93,10 +85,9 @@ describe('summarize', () => {
   });
 
   it('LLM呼び出しが失敗してもフォールバック文言でupsertし例外を投げない', async () => {
-    mockLimit.mockResolvedValue({
-      data: [{ title: 'テスト記事', summary_ja: '要約' }],
-      error: null,
-    });
+    mockSelectTopTopics.mockResolvedValue([
+      { groupLabel: 'Claude Code', title: 'テスト記事', summary_ja: '要約' },
+    ]);
     mockGenerateContent.mockRejectedValue(new Error('API error'));
 
     await expect(summarize()).resolves.not.toThrow();
@@ -106,8 +97,8 @@ describe('summarize', () => {
     expect(payload.summary_ja.length).toBeGreaterThan(0);
   });
 
-  it('TOP5取得が失敗してもフォールバック文言でupsertし例外を投げない', async () => {
-    mockLimit.mockResolvedValue({ data: null, error: { message: 'db error' } });
+  it('トピック取得が失敗してもフォールバック文言でupsertし例外を投げない', async () => {
+    mockSelectTopTopics.mockRejectedValue(new Error('db error'));
 
     await expect(summarize()).resolves.not.toThrow();
 
@@ -116,7 +107,7 @@ describe('summarize', () => {
   });
 
   it('upsert自体が失敗してもsummarize全体は例外を投げない（fail-soft）', async () => {
-    mockLimit.mockResolvedValue({ data: [], error: null });
+    mockSelectTopTopics.mockResolvedValue([]);
     mockUpsert.mockResolvedValue({ error: { message: 'upsert failed' } });
 
     await expect(summarize()).resolves.not.toThrow();
@@ -124,10 +115,9 @@ describe('summarize', () => {
 
   it('GEMINI_API_KEY未設定でもフォールバック文言でupsertし例外を投げない', async () => {
     delete process.env.GEMINI_API_KEY;
-    mockLimit.mockResolvedValue({
-      data: [{ title: 'テスト記事', summary_ja: '要約' }],
-      error: null,
-    });
+    mockSelectTopTopics.mockResolvedValue([
+      { groupLabel: 'Claude Code', title: 'テスト記事', summary_ja: '要約' },
+    ]);
 
     await expect(summarize()).resolves.not.toThrow();
 
@@ -137,7 +127,7 @@ describe('summarize', () => {
   });
 
   it('date は JST 基準で計算する（UTC日跨ぎでもJSTの日付になる）', async () => {
-    mockLimit.mockResolvedValue({ data: [], error: null });
+    mockSelectTopTopics.mockResolvedValue([]);
     vi.useFakeTimers();
     // UTC 2026-07-05T16:30:00Z = JST 2026-07-06T01:30:00
     vi.setSystemTime(new Date('2026-07-05T16:30:00Z'));

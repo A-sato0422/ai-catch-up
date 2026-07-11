@@ -4,9 +4,9 @@
 // 仕様の正典: SPEC_EXPANSION.md §7.1
 import type { ScreenConfig, ScreenDisplayConfig } from '../types';
 
-/** TOP5（固定枠）の表示設定。従来のデザインを維持する。 */
+/** 重要トピック（固定枠）の表示設定。先頭に順位番号ではなくグループ名バッジを出す。 */
 export const TOP5_DISPLAY: ScreenDisplayConfig = {
-  hasNumber: true,
+  hasGroupLabel: true,
   hasSource: true,
   chevron: true,
   expand: true,

@@ -173,7 +173,7 @@ export default function SettingsPage() {
           style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}
         >
           <span style={{ color: 'var(--muted)', fontSize: 14.5 }}>
-            最大5つまで選べます（TOP5・お気に入りは常に表示）
+            最大5つまで選べます（重要トピック・お気に入りは常に表示）
           </span>
           <button
             onClick={() => setShowAttributePopup(true)}

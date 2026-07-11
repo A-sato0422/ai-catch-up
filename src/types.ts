@@ -23,6 +23,9 @@ export interface Article {
   audience?: Audience;
   category?: Category;
   difficulty?: number;
+  // 重要トピック画面（special: 'top5'）専用。この記事が代表するボタングループ名（例「Claude Code」）を
+  // カード先頭のバッジに表示する。他画面では undefined。
+  groupLabel?: string;
 }
 
 /**
@@ -31,6 +34,8 @@ export interface Article {
  */
 export interface ScreenDisplayConfig {
   hasNumber?: boolean;
+  // 重要トピック画面用: カード先頭に順位番号ではなくグループ名バッジ（article.groupLabel）を表示する
+  hasGroupLabel?: boolean;
   hasBar?: boolean;
   hasBrand?: boolean;
   hasSource?: boolean;

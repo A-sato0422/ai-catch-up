@@ -1,8 +1,8 @@
 // フェーズ F: Slack 通知（SPEC_EXPANSION §8）
 //
-// 当日 TOP5（直近24時間・importance_score 降順。summarize.ts / D-023 と同じ定義）と
-// daily_summaries の当日行（summary_ja）を Slack Incoming Webhook へ Block Kit 形式で
-// 1 日 1 投稿する。LLM コールは行わない（既存の summary_ja を流用するのみ）。
+// 当日の重要トピック（ボタン5グループ別の当日最重要記事1件ずつ。summarize.ts / src/hooks/useArticles.ts
+// と同じ選定。lib/topTopics.ts）と daily_summaries の当日行（summary_ja）を Slack Incoming Webhook へ
+// Block Kit 形式で 1 日 1 投稿する。LLM コールは行わない（既存の summary_ja を流用するのみ）。
 //
 // fail-soft（CLAUDE.md §4 / TASK_EXPANSION フェーズ F）:
 // SLACK_WEBHOOK_URL 未設定・Supabase 取得失敗・Webhook POST 失敗のいずれでも
@@ -10,9 +10,10 @@
 import './env.js';
 import { fileURLToPath } from 'url';
 import { supabase } from './lib/supabase.js';
+import { selectTopTopics, type TopTopicRow } from './lib/topTopics.js';
 
-// TOP5 の定義は summarize.ts / src/hooks/useArticles.ts と同じローリング24時間ウィンドウ（D-023）
-const TOP5_WINDOW_MS = 24 * 60 * 60 * 1000;
+// 対象期間は summarize.ts / src/hooks/useArticles.ts と同じローリング24時間ウィンドウ（D-023）
+const TOPIC_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // daily_summaries の当日行が無い場合のフォールバック文言。
 // フロント側 src/lib/dailySummary.ts の FALLBACK_SUMMARY と同一文言（SPEC_EXPANSION §7.5）
@@ -21,25 +22,9 @@ export const FALLBACK_SUMMARY = '今日はまだ情報を集めてるよ。';
 // 記事 0 件の日の本文。フロントの空状態と同じく「バグではなく今日は静かだった」と伝わる表現にする
 const EMPTY_DAY_TEXT = '今日はAI界隈が静かな一日だったみたい。また明日チェックしてね。';
 
-interface Top5Row {
-  title: string;
-  url: string;
-  summary_ja: string | null;
-  importance_score: number | null;
-  importance_reason: string | null;
-}
-
-async function fetchTop5(): Promise<Top5Row[]> {
-  const windowStart = new Date(Date.now() - TOP5_WINDOW_MS).toISOString();
-  const { data, error } = await supabase
-    .from('articles')
-    .select('title, url, summary_ja, importance_score, importance_reason')
-    .gte('published_at', windowStart)
-    .order('importance_score', { ascending: false })
-    .limit(5);
-
-  if (error) throw new Error(`fetch top5 failed: ${error.message}`);
-  return (data ?? []) as Top5Row[];
+async function fetchTopTopics(): Promise<TopTopicRow[]> {
+  const windowStart = new Date(Date.now() - TOPIC_WINDOW_MS).toISOString();
+  return selectTopTopics(windowStart);
 }
 
 // GitHub Actions の実行環境は UTC のため、JST (UTC+9) に変換してから日付部分を取り出す
@@ -87,9 +72,10 @@ export interface SlackPayload {
   blocks: SlackBlock[];
 }
 
-function buildArticleBlock(article: Top5Row, index: number): SlackBlock {
+function buildArticleBlock(article: TopTopicRow, index: number): SlackBlock {
   const title = escapeSlackText(article.title);
-  const lines = [`*${index + 1}. <${article.url}|${title}>*`];
+  // 先頭にグループ名を出す（画面カードのグループ名バッジと同じ体裁）
+  const lines = [`*${index + 1}. [${escapeSlackText(article.groupLabel)}] <${article.url}|${title}>*`];
 
   // 重要度と理由は 1 行にまとめる（カード表示「重要度 9 ｜ 破壊的変更」と同じ体裁。§7.6）
   if (article.importance_score != null) {
@@ -109,7 +95,7 @@ function buildArticleBlock(article: Top5Row, index: number): SlackBlock {
 export function buildSlackPayload(
   date: string,
   summaryJa: string,
-  articles: Top5Row[]
+  articles: TopTopicRow[]
 ): SlackPayload {
   const blocks: SlackBlock[] = [
     {
@@ -154,22 +140,22 @@ export async function notify(): Promise<void> {
     return;
   }
 
-  let top5: Top5Row[];
+  let topics: TopTopicRow[];
   try {
-    top5 = await fetchTop5();
+    topics = await fetchTopTopics();
   } catch (err) {
-    // TOP5 が取れない状態で「記事 0 件」と誤解される投稿はしない。ログのみ残して終了する
-    console.error('[notify] fetch top5 failed, skipping notification:', err);
+    // トピックが取れない状態で「記事 0 件」と誤解される投稿はしない。ログのみ残して終了する
+    console.error('[notify] fetch top topics failed, skipping notification:', err);
     return;
   }
 
   const date = getJstDateString();
   const summaryJa = await fetchDailySummary(date);
-  const payload = buildSlackPayload(date, summaryJa, top5);
+  const payload = buildSlackPayload(date, summaryJa, topics);
 
   try {
     await postToSlack(webhookUrl, payload);
-    console.log(`[notify] posted ${top5.length} article(s) to Slack for ${date}`);
+    console.log(`[notify] posted ${topics.length} article(s) to Slack for ${date}`);
   } catch (err) {
     console.error('[notify] Slack post failed:', err);
   }

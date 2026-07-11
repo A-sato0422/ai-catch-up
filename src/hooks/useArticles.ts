@@ -1,17 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { loadButtonSelection } from '../lib/buttonSettings';
-import { buildFreeScreens } from '../lib/screens';
-import { matchesFilter } from '../lib/screenFilter';
+import { buildAllGroupScreens } from '../lib/screens';
 import type { Article, ScreenConfig, SourceType } from '../types';
 
 const TOP5_WINDOW_MS = 24 * 60 * 60 * 1000;
-const TOP5_LIMIT = 5;
-// TOP5 はチェック中カテゴリへの絞り込み（D-030・SPEC_EXPANSION §6）後に先頭5件を採用するため、
-// 絞り込みで目減りする分の余裕を持たせて広めに候補を取得する
-const TOP5_CANDIDATE_LIMIT = 50;
 // D-030: 自由枠（グループ単位の新画面）は published_at 降順・最新20件で打ち切る
 const LIST_LIMIT = 20;
+
+// articles テーブルから取得する列（TOP5・自由枠で共通）
+const ARTICLE_COLUMNS =
+  'id, url, source, product, title, excerpt, summary_ja, category, importance_score, importance_reason, tags, audience, difficulty, author, published_at';
 
 const KNOWN_PRODUCTS = new Set(['claude_code', 'gemini', 'codex', 'other']);
 const KNOWN_AUDIENCES = new Set(['engineer', 'backoffice', 'executive']);
@@ -92,25 +90,46 @@ export function useArticles(screenConfig: ScreenConfig): UseArticlesResult {
     setError(null);
 
     try {
-      let query = supabase.from('articles').select(
-        'id, url, source, product, title, excerpt, summary_ja, category, importance_score, importance_reason, tags, audience, difficulty, author, published_at'
-      );
+      // 直近24時間に公開された記事を対象にする（バッチは1日1回のみ実行のため、暦日境界だと
+      // 実行タイミング次第で新着が「前日扱い」になり永久に表示されなくなる。D-023）。
+      const windowStart = new Date(Date.now() - TOP5_WINDOW_MS).toISOString();
+
+      let mapped: Article[];
 
       if (screenConfig.special === 'top5') {
-        // 直近24時間に公開された記事を重要度降順で取得する。
-        // バッチは1日1回のみ実行のため、暦日境界だと実行タイミング次第で新着が
-        // 「前日扱い」になり永久に表示されなくなる（D-023）。実行タイミング非依存にするため
-        // 暦日ではなくローリングウィンドウで判定する。
-        // D-030: 選定対象はチェック中カテゴリの記事に絞るため、絞り込み後に5件へ削れるよう
-        // ここでは候補を広め（TOP5_CANDIDATE_LIMIT件）に取得しておく。
-        const windowStart = new Date(Date.now() - TOP5_WINDOW_MS).toISOString();
-        query = query
-          .gte('published_at', windowStart)
-          .order('importance_score', { ascending: false })
-          .limit(TOP5_CANDIDATE_LIMIT);
+        // 重要トピック: ボタン5グループそれぞれの当日最重要記事を1件ずつ選ぶ（全ユーザー一律）。
+        // 静かなグループ（codex/backoffice/exec 等）の記事が全体の上位から漏れて多様性が損なわれるのを
+        // 避けるため、単一クエリではなくグループ別に importance_score 降順・limit 1 で取得する。
+        // difficulty はエンジニア系グループの filter に含まれるが、未 enrich（difficulty=null）の記事も
+        // 拾えるよう選定では無視する（product/audience/category のみで絞る）。
+        const groupScreens = buildAllGroupScreens();
+        const results = await Promise.all(
+          groupScreens.map(async (screen) => {
+            const { filter } = screen;
+            let q = supabase.from('articles').select(ARTICLE_COLUMNS).gte('published_at', windowStart);
+            if (filter.product) q = q.eq('product', filter.product);
+            if (filter.audience) q = q.eq('audience', filter.audience);
+            if (filter.category && filter.category.length > 0) {
+              q = q.in('category', filter.category);
+            }
+            const { data, error: groupError } = await q
+              .order('importance_score', { ascending: false })
+              .limit(1);
+            if (groupError) throw new Error(groupError.message);
+            const row = data?.[0];
+            if (!row) return null;
+            const article = rowToArticle(row as Record<string, unknown>);
+            // カード先頭のバッジに出すグループ名（例「Claude Code」「バックオフィス」）
+            article.groupLabel = screen.label;
+            return article;
+          })
+        );
+        // 該当0件のグループは除外し、グループ定義順（SETTINGS_GROUPS 順）を維持する
+        mapped = results.filter((a): a is Article => a !== null);
       } else {
         // 自由枠（グループ単位）: filter を合成する。product/audience は単一値の等価検索、
         // category/difficulty は複数指定可のため .in() を使う（§7.1）
+        let query = supabase.from('articles').select(ARTICLE_COLUMNS);
         const { filter } = screenConfig;
         if (filter.product) query = query.eq('product', filter.product);
         if (filter.audience) query = query.eq('audience', filter.audience);
@@ -123,32 +142,17 @@ export function useArticles(screenConfig: ScreenConfig): UseArticlesResult {
         // filter.keywords は ScreenConfig 型（§7.1）には存在するが、現状 deriveCustomButtons が
         // キーワード条件を生成する画面を持たないため未配線（将来キーワード指定の画面を追加する際に実装する）
 
-        query = query
+        const { data, error: supabaseError } = await query
           .order(screenConfig.sort === 'importance' ? 'importance_score' : 'published_at', {
             ascending: false,
           })
           .limit(LIST_LIMIT);
-      }
 
-      const { data, error: supabaseError } = await query;
-
-      if (supabaseError) {
-        throw new Error(supabaseError.message);
-      }
-
-      let mapped = (data ?? []).map(row => rowToArticle(row as Record<string, unknown>));
-
-      if (screenConfig.special === 'top5') {
-        // D-030: TOP5 の選定対象をユーザーがチェック中（ホームに表示中）のカテゴリに絞る。
-        // 自由枠を1つも選択していない場合は絞り込み条件が空集合になり必ず0件になってしまうため、
-        // フィルタ自体をスキップして全件を対象にする（フォールバック。完了報告で判断理由を共有）。
-        const freeScreens = buildFreeScreens(loadButtonSelection());
-        if (freeScreens.length > 0) {
-          mapped = mapped.filter(article =>
-            freeScreens.some(screen => matchesFilter(article, screen.filter))
-          );
+        if (supabaseError) {
+          throw new Error(supabaseError.message);
         }
-        mapped = mapped.slice(0, TOP5_LIMIT);
+
+        mapped = (data ?? []).map(row => rowToArticle(row as Record<string, unknown>));
       }
 
       setArticles(mapped);

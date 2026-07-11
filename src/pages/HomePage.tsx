@@ -232,7 +232,7 @@ export default function HomePage() {
               gradientTo={gradientTo}
               animDelay={`${NAV_ANIM_BASE_DELAY + i * NAV_ANIM_STEP}s`}
             >
-              <ScreenIconGlyph kind={screen.icon} size={22} />
+              <ScreenIconGlyph kind={screen.icon} size={28} />
             </NavCircle>
           );
         })}

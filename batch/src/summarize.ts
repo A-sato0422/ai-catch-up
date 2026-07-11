@@ -1,50 +1,38 @@
 // フェーズ E: 一言サマリー（吹き出し）生成（SPEC_EXPANSION §3.2 / §7.5, D-032）
 //
-// 当日 TOP5（直近24時間・importance_score 降順。D-023 と同じ定義）のタイトル + 要約を
-// 1 コールで LLM に渡し、ホーム画面のロボット吹き出し用の一言サマリーを生成して
-// daily_summaries へ date（JST）で upsert する。
+// 当日の重要トピック（ボタン5グループ別の当日最重要記事1件ずつ。src/hooks/useArticles.ts と同じ選定。
+// lib/topTopics.ts）のタイトル + 要約を 1 コールで LLM に渡し、ホーム画面のロボット吹き出し用の
+// 一言サマリーを生成して daily_summaries へ date（JST）で upsert する。
 //
 // 既存の LLMProvider 抽象化（llm/index.ts）は「1 記事 1 コール」の enrich() 用に設計されており、
-// 本ファイルの「TOP5 複数記事 → 1 サマリー」という別種の呼び出しには使い回さず、
+// 本ファイルの「複数記事 → 1 サマリー」という別種の呼び出しには使い回さず、
 // GoogleGenerativeAI を直接叩く（llm/gemini.ts の実装パターンを参考にしつつ、このファイル内で完結させる）。
 import './env.js';
 import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from './lib/supabase.js';
+import { selectTopTopics, type TopTopicRow } from './lib/topTopics.js';
 
 // モデルは env で上書き可能（llm/gemini.ts と同じパターン。SPEC_EXPANSION §2）
 const MODEL_NAME = process.env.GEMINI_PRIMARY_MODEL ?? 'gemini-3.1-flash-lite';
 
-// TOP5 の定義は D-023 のローリング24時間ウィンドウに合わせる（src/hooks/useArticles.ts と同じ定義）
-const TOP5_WINDOW_MS = 24 * 60 * 60 * 1000;
+// 対象期間は D-023 のローリング24時間ウィンドウ（src/hooks/useArticles.ts / notify.ts と同じ定義）
+const TOPIC_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // 記事0件の日 / LLM 失敗時のフォールバック文言（SPEC_EXPANSION §7.5 の例文をそのまま採用）
 const FALLBACK_SUMMARY = '今日はまだ情報を集めてるよ。';
 
-interface Top5Row {
-  title: string;
-  summary_ja: string | null;
+async function fetchTopTopics(): Promise<TopTopicRow[]> {
+  const windowStart = new Date(Date.now() - TOPIC_WINDOW_MS).toISOString();
+  return selectTopTopics(windowStart);
 }
 
-async function fetchTop5(): Promise<Top5Row[]> {
-  const windowStart = new Date(Date.now() - TOP5_WINDOW_MS).toISOString();
-  const { data, error } = await supabase
-    .from('articles')
-    .select('title, summary_ja')
-    .gte('published_at', windowStart)
-    .order('importance_score', { ascending: false })
-    .limit(5);
-
-  if (error) throw new Error(`fetch top5 failed: ${error.message}`);
-  return (data ?? []) as Top5Row[];
-}
-
-function buildPrompt(articles: Top5Row[]): string {
+function buildPrompt(articles: TopTopicRow[]): string {
   const list = articles
-    .map((a, i) => `${i + 1}. ${a.title}\n${a.summary_ja ?? ''}`)
+    .map((a, i) => `${i + 1}. [${a.groupLabel}] ${a.title}\n${a.summary_ja ?? ''}`)
     .join('\n\n');
 
-  return `以下は今日の重要ニュース TOP5 のタイトルと要約です。これらを踏まえて、ホーム画面のロボットキャラクターが話す一言サマリーを日本語で作成してください。
+  return `以下は今日の重要トピック（分野別のピックアップ）のタイトルと要約です。これらを踏まえて、ホーム画面のロボットキャラクターが話す一言サマリーを日本語で作成してください。
 
 出力条件:
 - 3 行以内
@@ -55,7 +43,7 @@ TOP5:
 ${list}`;
 }
 
-async function generateSummary(articles: Top5Row[]): Promise<string> {
+async function generateSummary(articles: TopTopicRow[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 
@@ -98,16 +86,16 @@ async function upsertSummaryFailSoft(date: string, summaryJa: string): Promise<v
 export async function summarize(): Promise<void> {
   const date = getJstDateString();
 
-  let top5: Top5Row[] = [];
+  let topics: TopTopicRow[] = [];
   try {
-    top5 = await fetchTop5();
+    topics = await fetchTopTopics();
   } catch (err) {
-    console.error('[summarize] fetch top5 failed:', err);
+    console.error('[summarize] fetch top topics failed:', err);
     await upsertSummaryFailSoft(date, FALLBACK_SUMMARY);
     return;
   }
 
-  if (top5.length === 0) {
+  if (topics.length === 0) {
     // 記事0件の日は LLM 呼び出し自体をスキップし、定型文をそのまま保存する（SPEC_EXPANSION §7.5）
     console.log('[summarize] no articles in the last 24h, using fallback text');
     await upsertSummaryFailSoft(date, FALLBACK_SUMMARY);
@@ -116,7 +104,7 @@ export async function summarize(): Promise<void> {
 
   let summaryJa = FALLBACK_SUMMARY;
   try {
-    summaryJa = await generateSummary(top5);
+    summaryJa = await generateSummary(topics);
   } catch (err) {
     // LLM 生成の失敗はフェイルソフトでフォールバック文言に切り替え、collect 全体を止めない
     console.error('[summarize] LLM generation failed, falling back:', err);

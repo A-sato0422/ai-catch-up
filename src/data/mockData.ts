@@ -226,7 +226,7 @@ export const SCREEN_CONFIG: Record<Screen, ScreenDisplayConfig> = {
 };
 
 export const SCREEN_META: Record<Screen, ScreenMeta> = {
-  top5:       { title: '今日の重要 TOP5',      sub: '本日のピックアップ',                       iconEmoji: '🔥' },
+  top5:       { title: '重要トピック',          sub: 'グループ別の最重要トピック',               iconEmoji: '🔥' },
   update:     { title: 'アップデート',          sub: '新機能・リリース・仕様変更',               iconEmoji: '🚀' },
   tips:       { title: 'Tips（Claude Code）', sub: 'Claude Code の使い方・活用術・ハマりどころ', iconEmoji: '💡' },
   tipsGemini: { title: 'Tips（Gemini）',       sub: 'Gemini の使い方・活用術・ハマりどころ',    iconEmoji: '✨' },

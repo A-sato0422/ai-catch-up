@@ -4,13 +4,19 @@ import type { ScreenIconKind } from '../types';
 
 const ICON_COLOR = 'var(--muted)';
 
-function FlameIcon({ size }: { size: number }) {
+/** 重要トピック用: 王冠 + 先端の丸 3 個 + 中央に「1」 */
+function PodiumIcon({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="5" cy="5" r="1.3" stroke={ICON_COLOR} strokeWidth="1.4" />
+      <circle cx="12" cy="3.3" r="1.3" stroke={ICON_COLOR} strokeWidth="1.4" />
+      <circle cx="19" cy="5" r="1.3" stroke={ICON_COLOR} strokeWidth="1.4" />
       <path
-        d="M11 2C9.5 5 7 7.5 7 11.5C7 14.5 8.8 17 11 17C13.2 17 15 14.5 15 11.5C15 9.5 14.2 8 13 7C13 9 11.8 10.2 11 10.5C11 7.5 12 4.5 11 2Z"
-        stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+        d="M4 17.5L5.3 7.3L8.7 11.2L12 5.1L15.3 11.2L18.7 7.3L20 17.5Z"
+        stroke={ICON_COLOR} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"
       />
+      <path d="M4 17.5h16" stroke={ICON_COLOR} strokeWidth="1.4" strokeLinecap="round" />
+      <text x="12" y="16.3" textAnchor="middle" fontSize="7" fontWeight="700" fill={ICON_COLOR}>1</text>
     </svg>
   );
 }
@@ -28,7 +34,7 @@ function HeartIcon({ size }: { size: number }) {
 
 /** ホームのボタン・BottomNav で使う素のアイコン（ホバー/アクティブ時は呼び出し側で白反転させる） */
 export function ScreenIconGlyph({ kind, size = 20 }: { kind: ScreenIconKind; size?: number }) {
-  if (kind === 'top5') return <FlameIcon size={size} />;
+  if (kind === 'top5') return <PodiumIcon size={size} />;
   if (kind === 'fav') return <HeartIcon size={size} />;
   return <GroupIconSvg icon={kind} size={size} />;
 }
