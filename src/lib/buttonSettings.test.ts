@@ -5,6 +5,7 @@ import {
   isGroupSelected,
   saveButtonSelection,
   loadButtonSelection,
+  buildFullSelection,
   DEFAULT_SELECTION,
   BUTTON_SETTINGS_STORAGE_KEY,
   MAX_CUSTOM_BUTTONS,
@@ -44,10 +45,10 @@ describe('deriveCustomButtons', () => {
     });
   });
 
-  it('グループ内全選択なら subLabel は「すべて」', () => {
+  it('グループ内全選択でも subLabel は「すべて」に省略せず選択項目をすべて列挙する（フェーズI）', () => {
     const buttons = deriveCustomButtons({ gemini_beg: true, gemini_mid: true, gemini_adv: true });
     expect(buttons).toHaveLength(1);
-    expect(buttons[0].subLabel).toBe('すべて');
+    expect(buttons[0].subLabel).toBe('初級・中級・上級');
     expect(buttons[0].filter.difficulty).toEqual([1, 2, 3]);
   });
 
@@ -55,7 +56,7 @@ describe('deriveCustomButtons', () => {
     const buttons = deriveCustomButtons({ backoffice_tips: true, backoffice_cases: true });
     expect(buttons).toHaveLength(1);
     expect(buttons[0].label).toBe('バックオフィス');
-    expect(buttons[0].subLabel).toBe('すべて');
+    expect(buttons[0].subLabel).toBe('活用Tips・導入事例');
     expect(buttons[0].filter).toEqual({
       audience: 'backoffice',
       category: ['tips', 'case_study'],
@@ -124,7 +125,7 @@ describe('countSelectedButtons / isGroupSelected', () => {
     expect(countSelectedButtons(DEFAULT_SELECTION)).toBe(2);
     const buttons = deriveCustomButtons(DEFAULT_SELECTION);
     expect(buttons.map((b) => b.id)).toEqual(['gemini', 'claude']);
-    expect(buttons.every((b) => b.subLabel === 'すべて')).toBe(true);
+    expect(buttons.every((b) => b.subLabel === '初級・中級・上級')).toBe(true);
   });
 });
 
@@ -176,5 +177,22 @@ describe('SETTINGS_GROUPS の定義', () => {
     expect(SETTINGS_GROUPS).toHaveLength(5);
     const totalItems = SETTINGS_GROUPS.reduce((sum, g) => sum + g.items.length, 0);
     expect(totalItems).toBe(13);
+  });
+});
+
+describe('buildFullSelection（フェーズI: 設定画面の「すべて選択」用）', () => {
+  it('全チェックボックスが true になった選択状態を返す', () => {
+    const full = buildFullSelection();
+    const totalItems = SETTINGS_GROUPS.reduce((sum, g) => sum + g.items.length, 0);
+    expect(Object.keys(full)).toHaveLength(totalItems);
+    expect(Object.values(full).every((v) => v === true)).toBe(true);
+    expect(countSelectedButtons(full)).toBe(5);
+  });
+
+  it('呼び出しごとに独立したオブジェクトを返す', () => {
+    const a = buildFullSelection();
+    a.gemini_beg = false;
+    const b = buildFullSelection();
+    expect(b.gemini_beg).toBe(true);
   });
 });

@@ -12,9 +12,12 @@ export const TOP5_DISPLAY: ScreenDisplayConfig = {
   expand: true,
 };
 
-/** お気に入り（固定枠）の表示設定。従来のデザインを維持する。 */
+/**
+ * お気に入り（固定枠）の表示設定。
+ * フェーズI: 他画面と同様に左端の色帯（hasBar）は表示しない（お気に入りのみ帯があるのは
+ * 不統一という指摘のため撤去）。
+ */
 export const FAV_DISPLAY: ScreenDisplayConfig = {
-  hasBar: true,
   hasSource: true,
   chevron: true,
   expand: true,

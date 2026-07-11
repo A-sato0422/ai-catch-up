@@ -6,7 +6,7 @@ import type { ScreenConfig } from '../types';
 import {
   SETTINGS_GROUPS,
   deriveCustomButtons,
-  checkboxId,
+  buildFullSelection,
   type ButtonSelection,
   type CustomButtonConfig,
   type GroupIcon,
@@ -21,7 +21,7 @@ import {
 export const TOP5_SCREEN: ScreenConfig = {
   id: 'top5',
   label: '重要トピック',
-  subLabel: 'グループ別の最重要トピック',
+  subLabel: '直近24時間の重要記事をピックアップ。毎朝5時に更新',
   icon: 'top5',
   special: 'top5',
   filter: {},
@@ -74,13 +74,7 @@ export function buildFreeScreens(selection: ButtonSelection): ScreenConfig[] {
  * （useArticles）では未 enrich 記事も拾うために difficulty 条件を落として使う。
  */
 export function buildAllGroupScreens(): ScreenConfig[] {
-  const all: ButtonSelection = {};
-  for (const group of SETTINGS_GROUPS) {
-    for (const item of group.items) {
-      all[checkboxId(group.key, item.sub)] = true;
-    }
-  }
-  return buildFreeScreens(all);
+  return buildFreeScreens(buildFullSelection());
 }
 
 /**

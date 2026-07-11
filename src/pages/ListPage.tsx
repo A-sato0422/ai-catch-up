@@ -1,18 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import lottie from 'lottie-web';
 import type { Article, ScreenConfig } from '../types';
 import { getDisplayConfig } from '../data/screenConfig';
 import { useArticles } from '../hooks/useArticles';
 import ArticleCard from '../components/ArticleCard';
 import { ScreenIconBadge } from '../components/ScreenIcon';
 import { loadFavorites, sortByDateDesc, isFavorited, toggleFavorite } from '../lib/favorites';
+import RobotSaludando from '../assets/lottie/RobotSaludando.json';
 
 interface Props {
   screenConfig: ScreenConfig;
 }
-
-const robotImages = Object.values(
-  import.meta.glob<{ default: string }>('../assets/robots/*.png', { eager: true })
-).map(m => m.default);
 
 // 固定枠（TOP5・お気に入り）は専用の空状態文言を維持する。自由枠（グループ単位の新画面)は
 // 内容が product/audience/category/difficulty の組み合わせで多様なため共通文言にする。
@@ -28,9 +26,27 @@ const EMPTY_SUB_BY_SPECIAL: Record<'top5' | 'fav', string> = {
 const DEFAULT_EMPTY_MESSAGE = 'このカテゴリは今日は静からしいよ';
 const DEFAULT_EMPTY_SUB = '新しい記事が来たらすぐここに並ぶよ';
 
-function useEmptyRobotSrc(): string {
-  const [src] = useState<string>(() => robotImages[Math.floor(Math.random() * robotImages.length)]);
-  return src;
+/**
+ * 空状態のロボット表示（フェーズI）。
+ * 以前は `src/assets/robots/*.png`（24枚）からランダムに静止画を選んでいたが、ランダム表示は
+ * 不要という指摘のため、ホーム画面・ヘッダーと同じロボット（Lottie・背景透過）1つに統一する。
+ */
+function EmptyStateRobot() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const anim = lottie.loadAnimation({
+      container: containerRef.current,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      animationData: RobotSaludando,
+    });
+    return () => anim.destroy();
+  }, []);
+
+  return <div ref={containerRef} aria-hidden="true" style={{ width: 120, opacity: 0.9 }} />;
 }
 
 function ScreenHeader({ screenConfig }: { screenConfig: ScreenConfig }) {
@@ -73,7 +89,6 @@ interface ArticleListBodyProps {
 // TOP5・自由枠・お気に入りに共通のヘッダー / ローディング / エラー / 空状態 / カード一覧描画。
 // データ取得方法（Supabase or localStorage）の違いは呼び出し側（FavScreenList / QueryScreenList）が吸収する。
 function ArticleListBody({ screenConfig, articles, loading, error, isFav, onToggleFav }: ArticleListBodyProps) {
-  const emptyRobotSrc = useEmptyRobotSrc();
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
   const displayConfig = getDisplayConfig(screenConfig);
@@ -114,7 +129,7 @@ function ArticleListBody({ screenConfig, articles, loading, error, isFav, onTogg
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             padding: '48px 20px', gap: 14,
           }}>
-            <img src={emptyRobotSrc} alt="" style={{ width: 120, opacity: 0.85 }} />
+            <EmptyStateRobot />
             <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--title)', textAlign: 'center' }}>
               {emptyMessage}
             </p>
@@ -137,15 +152,19 @@ function ArticleListBody({ screenConfig, articles, loading, error, isFav, onTogg
             />
           );
 
-          // 重要トピック画面はカードの外・上にグループ名をサブタイトルとして表示する
+          // 重要トピック画面はカードの外・上にグループ名をサブタイトルとして表示する。
+          // フェーズI: 見出しとして視認できるようフォントサイズ・太さを上げ、左にアクセントバーを付ける。
           if (displayConfig.hasGroupLabel && article.groupLabel) {
             return (
-              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                 <span style={{
-                  paddingLeft: 4,
-                  fontSize: 13, fontWeight: 800,
-                  color: 'var(--muted2)',
-                  letterSpacing: '0.02em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  paddingLeft: 10,
+                  borderLeft: '3px solid #ff5a2c',
+                  fontSize: 16, fontWeight: 900,
+                  color: 'var(--title)',
+                  letterSpacing: '0.01em',
                 }}>
                   {article.groupLabel}
                 </span>

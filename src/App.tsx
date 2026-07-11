@@ -7,14 +7,9 @@ import ListPage from './pages/ListPage';
 import GroupScreenPage from './pages/GroupScreenPage';
 import SettingsPage from './pages/SettingsPage';
 import SplashScreen, { shouldShowSplash } from './components/SplashScreen';
-import AttributePopup from './components/AttributePopup';
-import {
-  shouldShowAttributePopup,
-  markAttributeOnboarded,
-  presetForAttribute,
-  type AttributeId,
-} from './lib/attributePresets';
-import { saveButtonSelection } from './lib/buttonSettings';
+import AttributeOnboarding from './components/AttributeOnboarding';
+import { shouldShowAttributePopup, markAttributeOnboarded } from './lib/attributePresets';
+import { saveButtonSelection, type ButtonSelection } from './lib/buttonSettings';
 import { TOP5_SCREEN, FAV_SCREEN } from './lib/screens';
 
 export default function App() {
@@ -38,9 +33,10 @@ export default function App() {
     setShowSplash(false);
   };
 
-  // 初回訪問時の属性選択: プリセットを保存し、初回フラグを立ててポップアップを閉じる
-  const handleAttributeSelect = (attribute: AttributeId) => {
-    saveButtonSelection(presetForAttribute(attribute));
+  // 初回訪問時の属性選択（フェーズI: チェックボックスで選んだ選択状態をそのまま保存する）:
+  // 選択状態を保存し、初回フラグを立ててオンボーディング画面を閉じる
+  const handleOnboardingStart = (selection: ButtonSelection) => {
+    saveButtonSelection(selection);
     markAttributeOnboarded();
     setShowAttributePopup(false);
   };
@@ -59,12 +55,12 @@ export default function App() {
         >
           {/*
             スプラッシュ完了前（showSplash中）は何も描画しない（スプラッシュ自身が最前面に表示中のため）。
-            スプラッシュ完了後・初回訪問時はホーム画面より先に属性ポップアップを表示し、
+            スプラッシュ完了後・初回訪問時はホーム画面より先に属性選択オンボーディングを表示し、
             Routes（HomePage 等）は選択完了までマウントしない。これにより HomePage が
-            loadButtonSelection() を読む時点では既にプリセットが保存済みになる。
+            loadButtonSelection() を読む時点では既に選択状態が保存済みになる。
           */}
           {showSplash ? null : showAttributePopup ? (
-            <AttributePopup onSelect={handleAttributeSelect} />
+            <AttributeOnboarding onStart={handleOnboardingStart} />
           ) : (
             <BrowserRouter>
               <Routes>

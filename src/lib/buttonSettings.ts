@@ -15,7 +15,7 @@ export type ButtonSelection = Record<string, boolean>;
 export interface CustomButtonConfig {
   id: string; // グループ key
   label: string; // グループ名（ボタンのラベル）
-  subLabel: string; // 選択内容（例「初級・中級」。全選択なら「すべて」）
+  subLabel: string; // 選択内容をすべて列挙する（例「初級・中級・上級」。フェーズI: 「すべて」への省略はしない）
   filter: {
     product?: Product;
     audience: Audience;
@@ -139,10 +139,9 @@ export function deriveCustomButtons(selection: ButtonSelection): CustomButtonCon
     );
     if (checkedItems.length === 0) continue;
 
-    const subLabel =
-      checkedItems.length === group.items.length
-        ? 'すべて'
-        : checkedItems.map((item) => item.label).join('・');
+    // フェーズI: 全選択時も「すべて」と省略せず、選択項目をそのまま列挙する
+    // （例「初級・中級・上級」）。省略すると全選択かどうかが画面から読み取れないため。
+    const subLabel = checkedItems.map((item) => item.label).join('・');
 
     const audience = AUDIENCE_BY_GROUP[group.key];
     const product = ENGINEER_PRODUCT[group.key];
@@ -173,6 +172,20 @@ export function deriveCustomButtons(selection: ButtonSelection): CustomButtonCon
   }
 
   return buttons;
+}
+
+/**
+ * 全チェックボックスをオンにした選択状態を返す（設定画面の「すべて選択」ボタン・
+ * 重要トピック用の全グループ選定〈`screens.ts` の `buildAllGroupScreens`〉で共有する。フェーズI）。
+ */
+export function buildFullSelection(): ButtonSelection {
+  const selection: ButtonSelection = {};
+  for (const group of SETTINGS_GROUPS) {
+    for (const item of group.items) {
+      selection[checkboxId(group.key, item.sub)] = true;
+    }
+  }
+  return selection;
 }
 
 export function saveButtonSelection(selection: ButtonSelection): void {

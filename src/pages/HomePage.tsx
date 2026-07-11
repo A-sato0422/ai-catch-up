@@ -144,12 +144,15 @@ export default function HomePage() {
     }}>
       <div style={{ flex: 2 }} />
 
-      {/* Robot + speech bubble */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-start',
-        gap: 'clamp(16px, 3vw, 32px)',
-        width: '100%', maxWidth: 700,
-      }}>
+      {/* Robot + speech bubble — 画面幅が小さいときは縦並びにして視認性を保つ（フェーズI） */}
+      <div
+        className="flex-col sm:flex-row items-center sm:items-start"
+        style={{
+          display: 'flex',
+          gap: 'clamp(16px, 3vw, 32px)',
+          width: '100%', maxWidth: 700,
+        }}
+      >
         {/* Robot Lottie animation */}
         <div
           ref={robotRef}
@@ -161,9 +164,12 @@ export default function HomePage() {
         />
 
         {/* Speech bubble — appears last */}
-        <div style={{ position: 'relative', marginTop: 12, animation: 'fadeInUp 0.4s ease 1.1s both' }}>
-          {/* Triangle */}
-          <span style={{
+        <div
+          className="mt-0 sm:mt-3"
+          style={{ position: 'relative', animation: 'fadeInUp 0.4s ease 1.1s both' }}
+        >
+          {/* Triangle — 横並び（sm 以上）のときだけ意味を持つポインタなので、縦並びでは非表示にする */}
+          <span className="hidden sm:block" style={{
             position: 'absolute',
             left: -14, top: 24,
             borderWidth: '8px 14px 8px 0',
@@ -237,6 +243,26 @@ export default function HomePage() {
           );
         })}
       </div>
+
+      {/* 設定画面への導線（フェーズI）。ボタン数が変わっても案内が埋もれないよう控えめなサイズで下に配置する */}
+      <button
+        onClick={() => navigate('/settings')}
+        style={{
+          marginTop: 16,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'var(--muted2)',
+          fontSize: 12.5,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+          padding: 4,
+          textDecoration: 'underline',
+          textUnderlineOffset: 3,
+        }}
+      >
+        ボタンをカスタマイズする
+      </button>
 
       <div style={{ flex: 3 }} />
     </div>

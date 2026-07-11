@@ -1,24 +1,37 @@
+import { createPortal } from 'react-dom';
+import { useTheme } from '../context/ThemeContext';
 import { ATTRIBUTE_OPTIONS, type AttributeId } from '../lib/attributePresets';
 
 interface Props {
-  /** 属性を選んだ時の処理。保存・初回フラグ更新・state更新などは呼び出し側の責務（App.tsx / SettingsPage.tsx で分岐） */
+  /** 属性を選んだ時の処理（SettingsPage.tsx がページ内 state を更新する。localStorage への保存は「保存する」ボタン押下時） */
   onSelect: (attribute: AttributeId) => void;
   /**
-   * 閉じるボタンの表示要否。指定時のみ × ボタンを出す。
-   * 初回訪問時（App.tsx）は必ず1つ選んでもらう設計のため未指定（仕様上スキップ導線なし）。
-   * 設定画面からの再選択時（SettingsPage.tsx）は誤タップで開いた場合に戻れるよう指定する。
+   * 閉じるボタン・オーバーレイクリックでの閉じる導線の要否。指定時のみ有効にする。
+   * 現状は設定画面からの再選択時（SettingsPage.tsx）のみが利用箇所のため常に指定される。
    */
   onClose?: () => void;
 }
 
 /**
- * 属性選択ポップアップ（G-3）。初回訪問時の全画面ポップアップ・設定画面からの再選択モーダルの
- * 両方で同一コンポーネントを再利用する（SPEC_EXPANSION.md §7.3）。
+ * 属性選択ポップアップ（G-3）。設定画面の「属性から選び直す」モーダルとして使う
+ * （初回訪問時のオンボーディングはフェーズIで `AttributeOnboarding` に置き換え、このコンポーネントは
+ * 再選択モーダル専用になった）。
  * デザインは SettingsPage のカード（var(--card) 背景・var(--card-line) ボーダー・角丸16px）に合わせる。
+ *
+ * フェーズI: 呼び出し元（SettingsPage）のルート要素が `animation: fadeInUp ...`（fill-mode both →
+ * 終了後も `transform: translateY(0)` が残る）を持ち、position:fixed の containing block がビューポートで
+ * はなくその祖先になってしまい「画面中央に出ずスクロールが必要」になる不具合があったため、
+ * `document.body` に直接ポータル表示することで祖先の CSS の影響を受けないようにする。
+ * あわせて、オーバーレイ（背景）クリックでも閉じられるようにする（× ボタンのみだった導線を改善）。
+ * ポータル先は `[data-theme]` スコープ（Layout.tsx）の外になるため、ダークモード用 CSS 変数が
+ * 正しく解決されるようこのコンポーネント自身のルートに `data-theme` を付け直す。
  */
 export default function AttributePopup({ onSelect, onClose }: Props) {
-  return (
+  const { dark } = useTheme();
+  const modal = (
     <div
+      data-theme={dark ? 'dark' : 'light'}
+      onClick={() => onClose?.()}
       style={{
         position: 'fixed',
         inset: 0,
@@ -31,6 +44,7 @@ export default function AttributePopup({ onSelect, onClose }: Props) {
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'relative',
           width: '100%',
@@ -118,4 +132,6 @@ export default function AttributePopup({ onSelect, onClose }: Props) {
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

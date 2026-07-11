@@ -58,6 +58,9 @@ export default function ArticleCard({ article, config, isOpen, isFav, onToggleOp
   const barColor = isClaude ? '#ff5a2c' : '#2f6df0';
   const displayText = article.full;
   const [hovered, setHovered] = useState(false);
+  // 「元記事を開く」がクリック可能と伝わりにくいという指摘への対応（フェーズI）。
+  // ホバー時にブランドカラーへ反転させ、浮き上がるようなエフェクトを付ける。
+  const [linkHovered, setLinkHovered] = useState(false);
 
   return (
     <div
@@ -151,17 +154,22 @@ export default function ArticleCard({ article, config, isOpen, isFav, onToggleOp
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
+            onMouseEnter={() => setLinkHovered(true)}
+            onMouseLeave={() => setLinkHovered(false)}
             style={{
               marginTop: 14,
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px',
+              padding: '8px 16px',
               borderRadius: 8,
-              border: '1px solid var(--pill-line)',
-              background: 'var(--pill-bg)',
-              color: 'var(--muted2)',
-              fontSize: 12, fontWeight: 600,
+              border: linkHovered ? '1px solid transparent' : '1px solid var(--pill-line)',
+              background: linkHovered ? 'linear-gradient(135deg, #ff8a45, #ff4d28)' : 'var(--pill-bg)',
+              color: linkHovered ? '#fff' : 'var(--muted2)',
+              fontSize: 12.5, fontWeight: 700,
               cursor: 'pointer',
               textDecoration: 'none',
+              boxShadow: linkHovered ? '0 8px 20px rgba(255,90,44,.35)' : 'none',
+              transform: linkHovered ? 'translateY(-1px)' : 'translateY(0)',
+              transition: 'background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease',
             }}
           >
             <ExternalLinkIcon />
