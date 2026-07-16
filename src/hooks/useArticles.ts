@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { buildAllGroupScreens } from '../lib/screens';
 import type { Article, ScreenConfig, SourceType } from '../types';
 
-const TOP5_WINDOW_MS = 24 * 60 * 60 * 1000;
 // D-030: 自由枠（グループ単位の新画面）は published_at 降順・最新20件で打ち切る
 const LIST_LIMIT = 20;
 
@@ -90,42 +88,41 @@ export function useArticles(screenConfig: ScreenConfig): UseArticlesResult {
     setError(null);
 
     try {
-      // 直近24時間に公開された記事を対象にする（バッチは1日1回のみ実行のため、暦日境界だと
-      // 実行タイミング次第で新着が「前日扱い」になり永久に表示されなくなる。D-023）。
-      const windowStart = new Date(Date.now() - TOP5_WINDOW_MS).toISOString();
-
       let mapped: Article[];
 
       if (screenConfig.special === 'top5') {
-        // 重要トピック: ボタン5グループそれぞれの当日最重要記事を1件ずつ選ぶ（全ユーザー一律）。
-        // 静かなグループ（codex/backoffice/exec 等）の記事が全体の上位から漏れて多様性が損なわれるのを
-        // 避けるため、単一クエリではなくグループ別に importance_score 降順・limit 1 で取得する。
-        // difficulty はエンジニア系グループの filter に含まれるが、未 enrich（difficulty=null）の記事も
-        // 拾えるよう選定では無視する（product/audience/category のみで絞る）。
-        const groupScreens = buildAllGroupScreens();
-        const results = await Promise.all(
-          groupScreens.map(async (screen) => {
-            const { filter } = screen;
-            let q = supabase.from('articles').select(ARTICLE_COLUMNS).gte('published_at', windowStart);
-            if (filter.product) q = q.eq('product', filter.product);
-            if (filter.audience) q = q.eq('audience', filter.audience);
-            if (filter.category && filter.category.length > 0) {
-              q = q.in('category', filter.category);
-            }
-            const { data, error: groupError } = await q
-              .order('importance_score', { ascending: false })
-              .limit(1);
-            if (groupError) throw new Error(groupError.message);
-            const row = data?.[0];
-            if (!row) return null;
-            const article = rowToArticle(row as Record<string, unknown>);
+        // 重要トピック: collect バッチが選定・確定した daily_topics スナップショットをそのまま表示する
+        // （D-038。画面側で24時間ウィンドウを再計算すると起点時刻がバッチとずれ、Slack 通知と内容が
+        // 食い違うため選定はバッチに一本化した）。最新 date を出すので、バッチ実行前の深夜帯は前日分が出る。
+        const { data: latestRows, error: latestError } = await supabase
+          .from('daily_topics')
+          .select('date')
+          .order('date', { ascending: false })
+          .limit(1);
+        if (latestError) throw new Error(latestError.message);
+
+        const latestDate = latestRows?.[0]?.date;
+        if (!latestDate) {
+          // スナップショットが1件も無い（初回バッチ前など）は空表示にする
+          mapped = [];
+        } else {
+          const { data, error: topicsError } = await supabase
+            .from('daily_topics')
+            .select(`position, group_label, articles (${ARTICLE_COLUMNS})`)
+            .eq('date', latestDate)
+            .order('position', { ascending: true });
+          if (topicsError) throw new Error(topicsError.message);
+
+          mapped = (data ?? []).flatMap((row) => {
+            // articles は FK 埋め込み（多対1）なのでオブジェクト。null は記事削除直後の異常系なのでスキップ
+            const embedded = (row as Record<string, unknown>).articles;
+            if (!embedded || typeof embedded !== 'object' || Array.isArray(embedded)) return [];
+            const article = rowToArticle(embedded as Record<string, unknown>);
             // カード先頭のバッジに出すグループ名（例「Claude Code」「バックオフィス」）
-            article.groupLabel = screen.label;
-            return article;
-          })
-        );
-        // 該当0件のグループは除外し、グループ定義順（SETTINGS_GROUPS 順）を維持する
-        mapped = results.filter((a): a is Article => a !== null);
+            article.groupLabel = String((row as Record<string, unknown>).group_label ?? '');
+            return [article];
+          });
+        }
       } else {
         // 自由枠（グループ単位）: filter を合成する。product/audience は単一値の等価検索、
         // category/difficulty は複数指定可のため .in() を使う（§7.1）

@@ -109,6 +109,8 @@ function NavCircle({
 export default function HomePage() {
   const navigate = useNavigate();
   const robotRef = useRef<HTMLDivElement>(null);
+  // 開始位相の同期用: krobo の span を lottie の enterFrame ハンドラから参照する
+  const kroboRef = useRef<HTMLSpanElement>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [showCursor, setShowCursor] = useState(false);
   // ホームのボタン配列は設定（localStorage）から動的生成する（固定枠2 + 自由枠最大5。G-1）
@@ -118,10 +120,11 @@ export default function HomePage() {
   // サイズ確定用の非表示プレースホルダーはフォールバック文言で仮置きし、レイアウトの揺れを避ける。
   const [summaryText, setSummaryText] = useState<string | null>(null);
 
-  // krobo ロゴの HTML 側フォールバック（span）への参照。
-  // 通常は下記 effect で Lottie SVG 内の胴体グループへ <text> を埋め込み、成功したらこの span を隠す。
-  // 埋め込みに失敗した場合のみ、従来どおり span を roboBob（CSS keyframes 並走）で動かす。
-  const kroboRef = useRef<HTMLSpanElement>(null);
+  // krobo ロゴの CSS アニメーションを lottie の再生開始と同じタイミングで始めるためのフラグ。
+  // lottie の再生クロックは loadAnimation() 直後ではなく最初の requestAnimationFrame から動き出すため、
+  // マウント時点でフラグを立てると CSS 側だけ先に走り出して位相ズレが固定化する（dev の StrictMode
+  // 再マウントでは lottie だけ作り直されて差がさらに広がる）。そこで最初のフレームが実際に描画された
+  // 瞬間（enterFrame）に合わせて roboBob を 0 秒目から開始する。
   const [robotStarted, setRobotStarted] = useState(false);
 
   useEffect(() => {
@@ -133,72 +136,36 @@ export default function HomePage() {
       autoplay: true,
       animationData: RobotSaludando,
     });
-    setRobotStarted(true);
-
-    // krobo ロゴを胴体レイヤー（position が唯一アニメーションする "Layer 1"）の <g> 内に
-    // SVG <text> として埋め込む。胴体と同じ transform グループに属するため、CSS 並走（実時間駆動）や
-    // 毎フレーム同期（1フレーム遅れ）と違い、位相ずれ・追従遅れが構造的に発生しない。
-    const internals = anim as unknown as {
-      animationData?: {
-        layers?: Array<{
-          ks?: { p?: { a?: number; k?: Array<{ s?: number[] }> }; a?: { k?: number[] } };
-        }>;
-      };
-      renderer?: { elements?: Array<{ layerElement?: SVGGElement }> };
+    const onFirstFrame = () => {
+      anim.removeEventListener('enterFrame', onFirstFrame);
+      setRobotStarted(true);
     };
-    let svgText: SVGTextElement | null = null;
-    // フォントサイズは従来 span の clamp(11px, 1.7vw, 15px) をキャンバス(800px)単位へ換算して維持する
-    const applyFontSize = () => {
-      const hostW = robotRef.current?.clientWidth;
-      if (!svgText || !hostW) return;
-      const px = Math.min(15, Math.max(11, window.innerWidth * 0.017));
-      svgText.setAttribute('font-size', String((px * 800) / hostW));
+    anim.addEventListener('enterFrame', onFirstFrame);
+    // roboBob（CSS・コンポジタスレッド駆動）と lottie（メインスレッドの rAF 駆動）は時計が別で、
+    // 特にページ初期読み込み中はメインスレッドの混雑で CSS アニメーションの実開始が遅れ、
+    // 「1 回だけの時計合わせ」では合わせた後のずれが固定化する（リロード直後だけずれる症状）。
+    // そこで毎フレーム両者の位相差を測り、閾値（60ms ≒ 位置差 0.2px 未満で目に見えない）を
+    // 超えたときだけ Web Animations API で CSS 側の時計を lottie に合わせ直す（自己修復）。
+    // 揃っている間は何もしないため、コンポジタ駆動の滑らかさはそのまま保たれる。
+    const periodMs = (anim.totalFrames / anim.frameRate) * 1000;
+    const onFrame = () => {
+      const span = kroboRef.current;
+      if (!span) return;
+      const cssAnim = span
+        .getAnimations()
+        .find((a): a is CSSAnimation => a instanceof CSSAnimation && a.animationName === 'roboBob');
+      if (!cssAnim || cssAnim.currentTime === null) return;
+      const expectedMs = (anim.currentFrame / anim.frameRate) * 1000;
+      // ループ周期を跨いでも比較できるよう、位相差を [-periodMs/2, periodMs/2) に正規化する
+      const drift =
+        (((Number(cssAnim.currentTime) - expectedMs) % periodMs) + periodMs * 1.5) % periodMs -
+        periodMs / 2;
+      if (Math.abs(drift) > 60) cssAnim.currentTime = expectedMs;
     };
-    const injectKrobo = () => {
-      if (svgText) return;
-      try {
-        const layers = internals.animationData?.layers ?? [];
-        const bodyIndex = layers.findIndex(l => l.ks?.p?.a === 1);
-        const bodyG = internals.renderer?.elements?.[bodyIndex]?.layerElement;
-        const body = layers[bodyIndex];
-        const p0 = body?.ks?.p?.k?.[0]?.s; // 静止時 position（フレーム0 = bob オフセット 0）
-        const a0 = body?.ks?.a?.k; // アンカーポイント
-        if (!bodyG || !p0 || !a0) return;
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        // 従来 span の left 50% / top 58% と同じ位置（キャンバス 400, 464）に中心配置。
-        // レイヤーのローカル座標 = アンカー + (目標 − 静止時 position)。scale 100% / rotation 0 前提
-        text.setAttribute('x', String(a0[0] + (400 - p0[0])));
-        text.setAttribute('y', String(a0[1] + (800 * 0.58 - p0[1])));
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('dominant-baseline', 'central');
-        text.setAttribute('aria-hidden', 'true');
-        text.textContent = 'krobo';
-        Object.assign(text.style, {
-          fontFamily: "'Noto Sans JP', -apple-system, sans-serif",
-          fontWeight: '800',
-          letterSpacing: '0.14em',
-          // 目・口と同じ水色（Lottie の eye/mouth 画像から採色した #54d7f6）。
-          // 不透明 + 発光シャドウだと「CSS を被せた感」が出て浮くため、影は付けず
-          // 半透明にして胴体の陰影を透かし、プリントのように馴染ませる。
-          fill: 'rgba(84, 215, 246, 0.75)',
-          pointerEvents: 'none',
-          userSelect: 'none',
-        });
-        bodyG.appendChild(text);
-        svgText = text;
-        applyFontSize();
-        if (kroboRef.current) kroboRef.current.style.display = 'none';
-      } catch {
-        // fail-soft: lottie 内部構造にアクセスできない場合は span + roboBob 表示のままにする
-      }
-    };
-    injectKrobo(); // DOM が同期的に構築済みならこの場で埋め込む
-    anim.addEventListener('DOMLoaded', injectKrobo); // 非同期構築の場合はこちらで埋め込む
-    window.addEventListener('resize', applyFontSize);
-    return () => {
-      window.removeEventListener('resize', applyFontSize);
-      anim.destroy();
-    };
+    anim.addEventListener('enterFrame', onFrame);
+    // 再マウント時は none → roboBob の遷移で CSS アニメーションを 0 秒目から再スタートさせる
+    setRobotStarted(false);
+    return () => anim.destroy();
   }, []);
 
   // daily_summaries の当日行を取得する（G-5・D-032）。取得完了・失敗いずれもフォールバック文言に収束する
@@ -260,10 +227,12 @@ export default function HomePage() {
       >
         {/*
           Robot Lottie animation + 「krobo」ロゴのオーバーレイ（フェーズJ）。
-          ロゴは通常マウント時の effect で Lottie SVG 内の胴体グループへ <text> として埋め込まれ、
-          胴体と同じ transform で動く（＝追従ずれが構造的に起こらない）。下の span はその埋め込みに
-          失敗したときだけ表示されるフォールバックで、roboBob（src/index.css。胴体キーフレームの写経、
-          周期 6.46667 秒）で並走させる。振幅はキャンバス(800px)比のため描画幅 --robot-w を共有して比例させる。
+          lottie-web が robotRef の innerHTML を完全に管理するため、ロゴを直接 DOM に挿し込むことはできない。
+          代わりに relative コンテナで robotRef に重ね、pointer-events: none の absolute な文字要素として置く。
+          上下運動は RobotSaludando.json の胴体レイヤーの position キーフレームを CSS keyframes（roboBob。
+          src/index.css）へそのまま写した値で、周期 6.46667 秒（194フレーム/30fps）・イージングも Lottie 側と
+          同一。振幅はキャンバス(800px)比のため描画幅 --robot-w を CSS 変数で共有して比例させる。
+          アニメーション開始は robotStarted（lottie の最初の enterFrame で立つ）まで遅らせ、起点を揃える。
         */}
         <div
           style={{
@@ -290,9 +259,9 @@ export default function HomePage() {
               fontWeight: 800,
               fontSize: 'clamp(11px, 1.7vw, 15px)',
               letterSpacing: '0.14em',
-              // 目・口と同じ水色を半透明・影なしで（SVG 埋め込み側と同一スタイル）。
-              // 不透明 + 発光シャドウは浮いて見えるため不採用（2026-07-16 ユーザー判断）
-              color: 'rgba(84, 215, 246, 0.75)',
+              color: 'rgba(255, 255, 255, 0.6)',
+              textShadow: '0 1px 0 rgba(255,255,255,0.3), 0 -1px 1px rgba(0,0,0,0.5)',
+              mixBlendMode: 'overlay',
               pointerEvents: 'none',
               userSelect: 'none',
               whiteSpace: 'nowrap',

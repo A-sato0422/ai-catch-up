@@ -175,8 +175,9 @@ export function deriveCustomButtons(selection: ButtonSelection): CustomButtonCon
 }
 
 /**
- * 全チェックボックスをオンにした選択状態を返す（設定画面の「すべて選択」ボタン・
- * 重要トピック用の全グループ選定〈`screens.ts` の `buildAllGroupScreens`〉で共有する。フェーズI）。
+ * 全チェックボックスをオンにした選択状態を返す（設定画面の「すべて選択」ボタンで使用。フェーズI。
+ * かつて重要トピックの全グループ選定でも共有していたが、フェーズ L で選定はバッチ側の
+ * daily_topics スナップショットに一本化された。D-038）。
  */
 export function buildFullSelection(): ButtonSelection {
   const selection: ButtonSelection = {};

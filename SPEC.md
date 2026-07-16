@@ -27,7 +27,7 @@ Claude Code / Gemini の最新情報を YouTube や X など複数 SNS を巡回
 - ホーム画面 + データ駆動の画面遷移（`ScreenConfig`）。TOP5 とお気に入りは固定枠、残り最大 5 ボタンはユーザーが設定画面で選択する自由枠（合計最大 7 ボタン。D-035）
 - 初回訪問時の属性選択ポップアップ（エンジニア初級/中級/上級・バックオフィス・経営者）によるボタン構成のプリセット適用
 - お気に入り機能（★ 押下時に記事オブジェクト全体を localStorage にスナップショット保存。永久保有。D-028）
-- ホーム画面の一言サマリー（吹き出し。当日 TOP5 から LLM 生成し `daily_summaries` に保存。D-032）
+- ホーム画面の一言サマリー（吹き出し。当日の重要トピック（`daily_topics`）から LLM 生成し `daily_summaries` に保存。D-032 / D-038）
 - Slack Incoming Webhook による当日 TOP5 + 一言サマリーの通知（1 日 1 投稿）
 - 古い記事の自動物理削除（30 日。D-029）
 - 自分（+ お試し複数人）専用（本格的な認証は作り込まない）
@@ -88,16 +88,17 @@ interface SourceConfig {
   4. URL 正規化 → DB に既存の URL はスキップ（重複排除）
   5. 新規記事のみ LLMProvider.enrich() → { summaryJa, category, importanceScore, importanceReason, tags, audience, difficulty }
   6. Supabase に upsert（URL 一意キー）
-  7. 当日 TOP5 確定後、タイトル+要約から一言サマリーを 1 コール生成し daily_summaries へ upsert
-  8. 当日 TOP5 + 一言サマリーを Slack Incoming Webhook へ POST（fail-soft。失敗しても collect 全体は継続）
+  7. 当日の重要トピック（5 ボタングループ別の最重要 1 件ずつ。§6.4）を確定し、daily_topics へスナップショット保存（D-038）
+  8. スナップショットのタイトル+要約から一言サマリーを 1 コール生成し daily_summaries へ upsert
+  9. スナップショット + 一言サマリーを Slack Incoming Webhook へ POST（fail-soft。失敗しても collect 全体は継続）
 
 [GitHub Actions: cleanup.yml（週次 cron）]
-  9. published_at が 30 日より古い記事を物理削除（is_favorite は参照しない。お気に入りは localStorage 側で独立して永久保有。D-029）
+  10. published_at が 30 日より古い記事を物理削除（is_favorite は参照しない。お気に入りは localStorage 側で独立して永久保有。D-029）。daily_topics の古い行は articles の削除に FK cascade で自動追従
 
 [Vercel: フロント]
-  10. 初回訪問時は属性選択ポップアップでボタン構成のプリセットを適用（localStorage）
-  11. Supabase を読み、ホーム画面のボタン（ScreenConfig 駆動。固定枠2+自由枠最大5）から各画面へ遷移して表示
-  12. ★ でお気に入りをトグル（記事オブジェクト全体を localStorage にスナップショット保存。DB は更新しない）
+  11. 初回訪問時は属性選択ポップアップでボタン構成のプリセットを適用（localStorage）
+  12. Supabase を読み、ホーム画面のボタン（ScreenConfig 駆動。固定枠2+自由枠最大5）から各画面へ遷移して表示（重要トピックは daily_topics の最新スナップショットを表示）
+  13. ★ でお気に入りをトグル（記事オブジェクト全体を localStorage にスナップショット保存。DB は更新しない）
 ```
 
 ソース単位で fail-soft（1 ソースの失敗で全体を止めない）。Slack 通知の失敗も fail-soft。
@@ -143,15 +144,27 @@ interface SourceConfig {
 | `summary_ja` | text | NOT NULL | ホーム吹き出し用の一言サマリー（3 行以内・口語） |
 | `created_at` | timestamptz | default now() | |
 
-当日 TOP5 確定後にタイトル+要約から 1 コールで生成し、date で upsert。全体 TOP5 ベースの共通サマリー 1 本のみ（属性別の作り分けはしない。D-032）。Slack 通知の冒頭文にも流用する。
+当日の重要トピック確定後にタイトル+要約から 1 コールで生成し、date で upsert。共通サマリー 1 本のみ（属性別の作り分けはしない。D-032）。Slack 通知の冒頭文にも流用する。
 
-### 5.3 インデックス
+### 5.3 `daily_topics` テーブル（重要トピックのスナップショット。D-038）
+
+| カラム | 型 | 制約/既定 | 説明 |
+|---|---|---|---|
+| `date` | date | PK（複合） | JST の日付（バッチ実行日） |
+| `position` | int | PK（複合） | グループ定義順（0〜4。SETTINGS_GROUPS 順） |
+| `group_label` | text | NOT NULL | カード見出し/通知に出すグループ名（例「Claude Code」） |
+| `article_id` | uuid | NOT NULL, FK → articles(id) **on delete cascade** | 選定された記事 |
+| `created_at` | timestamptz | default now() | |
+
+collect バッチの最終ステップで当日の重要トピック（§6.4）を確定し、当日分を delete → insert で洗い替える。画面・一言サマリー・Slack 通知はすべてこのスナップショットを読む（選定クエリを再実行しない）。記事カラムは FK 埋め込み（PostgREST）で `articles` から取得する。cleanup の 30 日削除には FK cascade で自動追従するため、専用の掃除処理は不要。anon は読み取りのみ許可（RLS）。
+
+### 5.4 インデックス
 - `UNIQUE (url)`
 - `INDEX (published_at DESC)`
 - `INDEX (product, category)`
 - `INDEX (importance_score DESC)`
 
-### 5.4 URL 正規化ルール
+### 5.5 URL 正規化ルール
 - スキーム/ホストを小文字化
 - 末尾スラッシュの統一
 - トラッキングパラメータ（`utm_*`, `fbclid` 等）を除去
@@ -201,7 +214,9 @@ interface SourceConfig {
 判定は揺れやすい前提とし、迷ったら低い方に倒す（初級ユーザーに上級記事が混ざるのは軽傷、逆は避ける）。`business` 系は実質 1 固定。
 
 ### 6.4 「重要トピック」選定（旧「今日の重要 TOP5」）
-**直近 24 時間のローリングウィンドウ**（暦日境界ではなく現在時刻からの相対時間。D-023）を対象に、ホームの 5 ボタングループ（Gemini / Claude Code / Codex / バックオフィス / 経営者向け）**それぞれの最重要記事を 1 件ずつ**表示する（`importance_score` 降順・グループ別に `limit(1)`。最大 5 件。該当0件のグループは非表示）。**全ユーザー一律**（固定のグループ定義を使い、ユーザーのチェック状態には依存しない。D-036）。グループのフィルタは設定画面のグループ定義（§7.2）と同じ product / audience / category で、difficulty は選定では無視する（未 enrich 記事も対象に含める）。同点時のタイブレークは、(1) Qiita はストック数、(2) GitHub Releases は新しさ、(3) それ以外は `published_at` の新しさ、の順で補助的に使う。
+**collect バッチの最終ステップで 1 回だけ選定し、結果を `daily_topics` へスナップショット保存する**（D-038）。対象は**バッチ実行時点から遡る直近 24 時間のローリングウィンドウ**（暦日境界ではない。D-023）で、ホームの 5 ボタングループ（Gemini / Claude Code / Codex / バックオフィス / 経営者向け）**それぞれの最重要記事を 1 件ずつ**選ぶ（`importance_score` 降順・グループ別に `limit(1)`。最大 5 件。該当0件のグループは保存しない＝非表示）。**全ユーザー一律**（固定のグループ定義を使い、ユーザーのチェック状態には依存しない。D-036）。グループのフィルタは設定画面のグループ定義（§7.2）と同じ product / audience / category で、difficulty は選定では無視する（未 enrich 記事も対象に含める）。同点時のタイブレークは `published_at` の新しさ（決定的な順序にし、消費者間で結果が揺れないようにする）。
+
+画面・一言サマリー（§5.2）・Slack 通知（§8.4）はこのスナップショットを読むだけで、選定クエリを再実行しない。ウィンドウの起点が消費者ごとにずれて内容が食い違うことを防ぐため（D-038）。画面は最新 date のスナップショットを表示する（バッチ実行前の深夜帯は前日分が表示される）。
 
 ### 6.5 採用 LLM とコスト
 - 使用モデル: **Gemini 3.1 Flash-Lite（15 RPM / 500 RPD）単独**（D-024。旧 Flash → Flash-Lite フォールバック方式は 2025-12 の無料枠削減により廃止）。
@@ -242,7 +257,7 @@ interface ScreenConfig {
 
 | 区分 | 画面 | 内容 | 並び順 |
 |---|---|---|---|
-| 固定 | 重要トピック | 直近 24 時間・5 ボタングループ別の最重要 1 件ずつ（全ユーザー一律・最大 5 件） | グループ別に importance_score 降順 |
+| 固定 | 重要トピック | バッチが確定した当日スナップショット（`daily_topics` の最新 date。5 ボタングループ別の最重要 1 件ずつ・全ユーザー一律・最大 5 件。§6.4） | グループ定義順（position） |
 | 固定 | お気に入り | localStorage に保存した記事全件 | published_at 降順 |
 | 自由（最大5） | 設定画面のグループ別チェックから動的生成（下表） | グループ単位で filter を合成 | published_at 降順 |
 
@@ -299,7 +314,7 @@ interface ScreenConfig {
 - トリガー: `schedule`（1 日 1 回）+ `workflow_dispatch`（手動実行）。
 - 頻度変更は cron 式の変更のみ。重複排除（upsert）により頻度を上げても安全。
 - 実行時間の実測値: 約 5〜7 分（280 件時想定 20 分以内に収まっている）。
-- 最終ステップで一言サマリー生成（daily_summaries upsert）→ Slack 通知（§8.4）を実行。いずれも fail-soft。
+- 最終ステップで重要トピック確定（daily_topics スナップショット保存。§6.4）→ 一言サマリー生成（daily_summaries upsert）→ Slack 通知（§8.4）を実行。いずれも fail-soft。
 - 注: GitHub Actions の `schedule` は指定時刻から数分〜十数分遅れて起動しうる（本用途では許容）。
 
 ### 8.2 クリーンアップワークフロー（cleanup.yml）
@@ -310,7 +325,7 @@ interface ScreenConfig {
 `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY`, `QIITA_TOKEN`, `SLACK_WEBHOOK_URL` を GitHub Actions Secrets に格納。リポジトリにコミットしない。
 
 ### 8.4 Slack 通知
-- collect.yml の最終ステップ（サマリー生成の後）で実行。当日 TOP5 + `daily_summaries.summary_ja` を Block Kit 形式で Incoming Webhook へ POST。
+- collect.yml の最終ステップ（サマリー生成の後）で実行。当日の重要トピック（`daily_topics` スナップショット。§6.4）+ `daily_summaries.summary_ja` を Block Kit 形式で Incoming Webhook へ POST。
 - LLM コールなし（既存の `summary_ja` を流用）。
 - 記事 0 件の日は「静かだった」旨の本文で投稿。
 - fail-soft: 通知失敗が collect 全体を止めない（ユニットテストで検証済み）。
@@ -350,19 +365,21 @@ flowchart LR
         ADP["ソースアダプタ群<br/>fetch→正規化→dailyLimit/rankでカット"]
         FIL["関連度フィルタ / 重複排除"]
         LLM["LLMプロバイダ<br/>要約・分類3軸・スコア・理由・タグ"]
+        SNAP["重要トピック確定<br/>(daily_topics スナップショット)"]
         SUM["一言サマリー生成<br/>(daily_summaries)"]
         NOTIFY["Slack通知<br/>(fail-soft)"]
         CLN["クリーンアップ<br/>(週次・30日)"]
     end
 
     GEM["Gemini 3.1 Flash-Lite"]
-    DB[("Supabase<br/>articles / daily_summaries")]
+    DB[("Supabase<br/>articles / daily_summaries / daily_topics")]
     FE["Vercel フロント<br/>React + Vite<br/>(ScreenConfig駆動)"]
     LS[("localStorage<br/>設定/属性/お気に入り")]
     USER(["利用者"])
 
     Sources --> ADP --> FIL --> LLM --> DB
     LLM <--> GEM
+    DB --> SNAP --> DB
     DB --> SUM --> DB
     DB --> NOTIFY -.->|Webhook| SLACK["Slack"]
     CLN --> DB
@@ -399,10 +416,12 @@ sequenceDiagram
             COL->>COL: スキップ
         end
     end
-    COL->>DB: 当日TOP5取得
+    COL->>DB: 重要トピック選定（グループ別 importance 降順・limit 1）
+    COL->>DB: daily_topics へスナップショット保存（洗い替え）
+    COL->>DB: daily_topics 当日分読み出し
     COL->>LLM: 一言サマリー生成（1コール）
     COL->>DB: daily_summaries upsert
-    COL->>SLACK: TOP5+サマリーをPOST（fail-soft）
+    COL->>SLACK: 重要トピック+サマリーをPOST（fail-soft）
 ```
 
 ### 10.3 クラス図（抽象化レイヤー）

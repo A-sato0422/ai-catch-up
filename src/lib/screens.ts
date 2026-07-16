@@ -6,16 +6,15 @@ import type { ScreenConfig } from '../types';
 import {
   SETTINGS_GROUPS,
   deriveCustomButtons,
-  buildFullSelection,
   type ButtonSelection,
   type CustomButtonConfig,
   type GroupIcon,
 } from './buttonSettings';
 
 /**
- * 重要トピック（固定枠）。ボタン5グループそれぞれの当日最重要記事を1件ずつ表示する
- * （全ユーザー一律・チェック状態に依存しない。useArticles 側で `buildAllGroupScreens` を使い
- * グループ別に importance_score 降順・limit 1 で選定する）。id/special/icon は 'top5' を維持
+ * 重要トピック（固定枠）。collect バッチがグループ別に選定・確定した daily_topics の
+ * 最新スナップショットを表示する（全ユーザー一律・チェック状態に依存しない。D-038。
+ * 画面側では選定クエリを発行しない）。id/special/icon は 'top5' を維持
  * （ルーティング `/top5`・アイコン・グラデーション・空状態メッセージが依存するため）。
  */
 export const TOP5_SCREEN: ScreenConfig = {
@@ -65,16 +64,6 @@ export function customButtonToScreenConfig(button: CustomButtonConfig): ScreenCo
 /** 自由枠（グループ単位・最大5）の ScreenConfig 一覧。SETTINGS_GROUPS の定義順。 */
 export function buildFreeScreens(selection: ButtonSelection): ScreenConfig[] {
   return deriveCustomButtons(selection).map(customButtonToScreenConfig);
-}
-
-/**
- * 重要トピック用: 全グループ・全項目を選択した固定の5画面を返す（localStorage 非依存＝全ユーザー一律）。
- * 各 ScreenConfig は group.name をラベル（＝カード先頭のグループ名バッジ）に、product/audience/category
- * のフィルタを持つ。difficulty はエンジニア系グループの filter に含まれるが、重要トピックの選定側
- * （useArticles）では未 enrich 記事も拾うために difficulty 条件を落として使う。
- */
-export function buildAllGroupScreens(): ScreenConfig[] {
-  return buildFreeScreens(buildFullSelection());
 }
 
 /**

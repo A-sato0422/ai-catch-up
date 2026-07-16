@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// 重要トピックの選定は lib/topTopics.ts（selectTopTopics）へ切り出したため、notify のテストは
-// クエリ形状に依存せず selectTopTopics を直接モックする。daily_summaries の取得のみ supabase を使う。
-const { mockSelectTopTopics, mockMaybeSingle } = vi.hoisted(() => ({
-  mockSelectTopTopics: vi.fn(),
+// 重要トピックは daily_topics スナップショットの読み出し（fetchSavedTopTopics。D-038）に変わったため、
+// notify のテストはクエリ形状に依存せず fetchSavedTopTopics を直接モックする。
+// daily_summaries の取得のみ supabase を使う。
+const { mockFetchSavedTopTopics, mockMaybeSingle } = vi.hoisted(() => ({
+  mockFetchSavedTopTopics: vi.fn(),
   mockMaybeSingle: vi.fn(),
 }));
 
 vi.mock('./lib/topTopics.js', () => ({
-  selectTopTopics: mockSelectTopTopics,
+  fetchSavedTopTopics: mockFetchSavedTopTopics,
 }));
 
 vi.mock('./lib/supabase.js', () => ({
@@ -34,6 +35,7 @@ const WEBHOOK_URL = 'https://hooks.slack.com/services/T000/B000/XXXX';
 
 const sampleTopics = [
   {
+    articleId: 'a1111111-1111-1111-1111-111111111111',
     groupLabel: 'Claude Code',
     title: 'Claude Code 4.0 リリース',
     url: 'https://example.com/claude-code-4',
@@ -42,6 +44,7 @@ const sampleTopics = [
     importance_reason: '破壊的変更',
   },
   {
+    articleId: 'a2222222-2222-2222-2222-222222222222',
     groupLabel: 'Gemini',
     title: 'Gemini 3.1 発表',
     url: 'https://example.com/gemini-3-1',
@@ -66,7 +69,7 @@ function postedPayload(fetchSpy: ReturnType<typeof mockFetchOk>) {
 describe('notify', () => {
   beforeEach(() => {
     process.env.SLACK_WEBHOOK_URL = WEBHOOK_URL;
-    mockSelectTopTopics.mockReset();
+    mockFetchSavedTopTopics.mockReset();
     mockMaybeSingle.mockReset();
   });
 
@@ -75,7 +78,7 @@ describe('notify', () => {
   });
 
   it('TOP5とサマリーをBlock Kit形式でWebhookへPOSTする', async () => {
-    mockSelectTopTopics.mockResolvedValue(sampleTopics);
+    mockFetchSavedTopTopics.mockResolvedValue(sampleTopics);
     mockMaybeSingle.mockResolvedValue({
       data: { summary_ja: '今日はClaude Codeに破壊的変更があったよ。' },
       error: null,
@@ -108,7 +111,7 @@ describe('notify', () => {
   });
 
   it('daily_summariesの当日行が無いときフォールバック文言を冒頭に使う', async () => {
-    mockSelectTopTopics.mockResolvedValue(sampleTopics);
+    mockFetchSavedTopTopics.mockResolvedValue(sampleTopics);
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     const fetchSpy = mockFetchOk();
 
@@ -119,7 +122,7 @@ describe('notify', () => {
   });
 
   it('daily_summariesの取得が失敗してもフォールバック文言で投稿する（fail-soft）', async () => {
-    mockSelectTopTopics.mockResolvedValue(sampleTopics);
+    mockFetchSavedTopTopics.mockResolvedValue(sampleTopics);
     mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'db error' } });
     const fetchSpy = mockFetchOk();
 
@@ -130,7 +133,7 @@ describe('notify', () => {
   });
 
   it('記事0件の日は「静かだった」旨の本文で投稿し破綻しない', async () => {
-    mockSelectTopTopics.mockResolvedValue([]);
+    mockFetchSavedTopTopics.mockResolvedValue([]);
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     const fetchSpy = mockFetchOk();
 
@@ -150,11 +153,11 @@ describe('notify', () => {
     await expect(notify()).resolves.not.toThrow();
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockSelectTopTopics).not.toHaveBeenCalled();
+    expect(mockFetchSavedTopTopics).not.toHaveBeenCalled();
   });
 
   it('トピック取得が失敗したらPOSTせず正常終了する（fail-soft）', async () => {
-    mockSelectTopTopics.mockRejectedValue(new Error('db error'));
+    mockFetchSavedTopTopics.mockRejectedValue(new Error('db error'));
     const fetchSpy = mockFetchOk();
 
     await expect(notify()).resolves.not.toThrow();
@@ -163,7 +166,7 @@ describe('notify', () => {
   });
 
   it('WebhookへのPOSTがrejectしても例外を投げない（fail-soft）', async () => {
-    mockSelectTopTopics.mockResolvedValue(sampleTopics);
+    mockFetchSavedTopTopics.mockResolvedValue(sampleTopics);
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
 
@@ -171,7 +174,7 @@ describe('notify', () => {
   });
 
   it('Webhookが非2xxを返しても例外を投げない（fail-soft）', async () => {
-    mockSelectTopTopics.mockResolvedValue(sampleTopics);
+    mockFetchSavedTopTopics.mockResolvedValue(sampleTopics);
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('invalid_blocks', { status: 400 })
@@ -185,6 +188,7 @@ describe('buildSlackPayload', () => {
   it('タイトル・要約・理由のmrkdwn予約文字（& < >）をエスケープする', () => {
     const payload = buildSlackPayload('2026-07-07', 'A & B', [
       {
+        articleId: 'a3333333-3333-3333-3333-333333333333',
         groupLabel: 'Gemini',
         title: '<script> & Gemini > Claude?',
         url: 'https://example.com/a',

@@ -1,58 +1,27 @@
-import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import lottie from 'lottie-web';
 import { useTheme } from '../context/ThemeContext';
-import RobotSaludando from '../assets/lottie/RobotSaludando.json';
+import headerLogo from '../assets/robots/header_log.png';
 
-// フェーズI: ヘッダーのロゴをホーム画面と同じロボット（Lottie・背景透過）に統一する。
-// 静的 PNG（白背景の丸角ボックス）を廃止し、ベクターアニメーションにすることで
-// ダークモードでも背景の不整合が起きない（CLAUDE.md §3 の対象外・見た目のみの変更）。
-//
-// フェーズJ: ヘッダーは常時再生のフルボディアニメーションではなく「顔のみの静止画」にする
-// （空状態ロボット・ホーム画面のロボットは対象外・フルボディのままでよい）。
-// 新規の画像生成はできないため、既存の RobotSaludando.json を loop/autoplay 無効で読み込み、
-// DOMLoaded 後に goToAndStop で1フレームに固定した上で、拡大＋overflow:hidden のクロップで
-// 顔まわり（head/eye/mouth レイヤーが集まる 800x800 viewBox 中央よりやや上）だけを見せる。
+// 2026-07-17: ヘッダーのロゴをユーザー支給の静止画（header_log.png・顔のみ）に変更。
+// 旧実装は RobotSaludando.json（Lottie）を goToAndStop + 拡大クロップで顔だけ見せる方式だったが、
+// 専用画像が用意されたため静止画に戻す。画像は背景が不透過のグレーグラデーションのため、
+// 円形にクロップしてバッジ風に見せる（ダークモードでも背景色との矛盾が出にくい）。
+// 元画像は 3:2 の横長なので object-fit: cover で中央の顔まわりだけを切り出す。
 function LogoIcon() {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const anim = lottie.loadAnimation({
-      container: containerRef.current,
-      renderer: 'svg',
-      loop: false,
-      autoplay: false,
-      animationData: RobotSaludando,
-    });
-    // DOMLoaded 前に goToAndStop すると描画されないフレームで止まることがあるため、
-    // ロード完了イベントを待ってから停止フレームを指定する。
-    const handleLoaded = () => anim.goToAndStop(0, true);
-    anim.addEventListener('DOMLoaded', handleLoaded);
-    return () => {
-      anim.removeEventListener('DOMLoaded', handleLoaded);
-      anim.destroy();
-    };
-  }, []);
-
   return (
-    <div
+    <img
+      src={headerLogo}
+      alt=""
       aria-hidden="true"
-      style={{ width: 44, height: 44, overflow: 'hidden', flexShrink: 0, position: 'relative' }}
-    >
-      <div
-        ref={containerRef}
-        style={{
-          width: '100%',
-          height: '100%',
-          // 800x800 の全身画像のうち、目・口を含む頭部まわり（およそ x:49%, y:40% 付近が中心）だけが
-          // 見えるよう拡大する。head/eye/mouth レイヤーの座標から概算した値のため、実際の見た目は
-          // ブラウザで確認しながら scale・transformOrigin を微調整すること（完了報告に明記）。
-          transform: 'scale(2.6)',
-          transformOrigin: '49% 40%',
-        }}
-      />
-    </div>
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        display: 'block',
+        flexShrink: 0,
+      }}
+    />
   );
 }
 

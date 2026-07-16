@@ -6,13 +6,24 @@ type MockRank = (a: RawArticle, b: RawArticle) => number;
 // --- モック定義（vi.hoisted で全変数を事前初期化）---
 // dailyLimit はテストのデフォルトでは十分大きい値（100）にし、既存の「カットされない」前提のテストが
 // そのまま通るようにする。実際にカットするケースは専用のテストケースで dailyLimit を上書きする。
-const { mockEnrich, mockUpsertArticle, mockDbIn, mockSource1, mockSource2, sourceConfigs } = vi.hoisted(() => {
+const {
+  mockEnrich,
+  mockUpsertArticle,
+  mockDbIn,
+  mockSelectTopTopics,
+  mockSaveTopTopics,
+  mockSource1,
+  mockSource2,
+  sourceConfigs,
+} = vi.hoisted(() => {
   const mockSource1 = { id: 'source1', fetch: vi.fn() };
   const mockSource2 = { id: 'source2', fetch: vi.fn() };
   return {
     mockEnrich: vi.fn(),
     mockUpsertArticle: vi.fn(),
     mockDbIn: vi.fn(),
+    mockSelectTopTopics: vi.fn(),
+    mockSaveTopTopics: vi.fn(),
     mockSource1,
     mockSource2,
     sourceConfigs: [
@@ -42,6 +53,12 @@ vi.mock('./sources/index.js', () => ({
   sourceConfigs,
 }));
 
+// 重要トピックのスナップショット（D-038）は supabase クエリの形状に依存させず関数ごとモックする
+vi.mock('./lib/topTopics.js', () => ({
+  selectTopTopics: mockSelectTopTopics,
+  saveTopTopics: mockSaveTopTopics,
+}));
+
 import { collect } from './collect.js';
 
 // --- テストデータ ---
@@ -63,10 +80,15 @@ describe('collect', () => {
     mockEnrich.mockReset();
     mockUpsertArticle.mockReset();
     mockDbIn.mockReset();
+    mockSelectTopTopics.mockReset();
+    mockSaveTopTopics.mockReset();
     // デフォルト: DB に既存 URL なし
     mockDbIn.mockResolvedValue({ data: [], error: null });
     mockEnrich.mockResolvedValue(defaultEnrichment);
     mockUpsertArticle.mockResolvedValue(undefined);
+    // デフォルト: スナップショット対象トピックなし・保存成功
+    mockSelectTopTopics.mockResolvedValue([]);
+    mockSaveTopTopics.mockResolvedValue(undefined);
     // sourceConfigs は共有オブジェクトのため、dailyLimit/rank を上書きしたテスト後に元へ戻す
     sourceConfigs[0].dailyLimit = 100;
     sourceConfigs[1].dailyLimit = 100;
@@ -234,5 +256,54 @@ describe('collect', () => {
       expect.arrayContaining(['https://example.com/high', 'https://example.com/mid'])
     );
     expect(calledUrls).not.toContain('https://example.com/low');
+  });
+
+  it('enrich 完了後に重要トピックを選定して daily_topics へ保存する（D-038）', async () => {
+    const topics = [
+      {
+        articleId: 'a1111111-1111-1111-1111-111111111111',
+        groupLabel: 'Claude Code',
+        title: 'Claude Code 4.0 リリース',
+        url: 'https://example.com/claude-code-4',
+        summary_ja: '破壊的変更あり',
+        importance_score: 9,
+        importance_reason: '破壊的変更',
+      },
+    ];
+    mockSource1.fetch.mockResolvedValue([makeArticle('https://example.com/a')]);
+    mockSource2.fetch.mockResolvedValue([]);
+    mockSelectTopTopics.mockResolvedValue(topics);
+
+    await collect();
+
+    // ウィンドウ起点は ISO 8601 で 1 回だけ渡され、選定結果が JST 日付とともに保存される
+    expect(mockSelectTopTopics).toHaveBeenCalledTimes(1);
+    const [windowStart] = mockSelectTopTopics.mock.calls[0];
+    expect(windowStart).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(mockSaveTopTopics).toHaveBeenCalledTimes(1);
+    const [date, savedTopics] = mockSaveTopTopics.mock.calls[0];
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(savedTopics).toEqual(topics);
+  });
+
+  it('スナップショット保存が失敗しても collect は例外を投げない（fail-soft）', async () => {
+    mockSource1.fetch.mockResolvedValue([makeArticle('https://example.com/a')]);
+    mockSource2.fetch.mockResolvedValue([]);
+    mockSaveTopTopics.mockRejectedValue(new Error('db error'));
+
+    await expect(collect()).resolves.not.toThrow();
+
+    // 収集・enrich 自体は完了している
+    expect(mockUpsertArticle).toHaveBeenCalledTimes(1);
+  });
+
+  it('トピック選定が失敗しても collect は例外を投げず保存も行わない（fail-soft）', async () => {
+    mockSource1.fetch.mockResolvedValue([makeArticle('https://example.com/a')]);
+    mockSource2.fetch.mockResolvedValue([]);
+    mockSelectTopTopics.mockRejectedValue(new Error('db error'));
+
+    await expect(collect()).resolves.not.toThrow();
+
+    expect(mockSaveTopTopics).not.toHaveBeenCalled();
   });
 });

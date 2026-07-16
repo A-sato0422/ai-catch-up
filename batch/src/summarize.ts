@@ -1,7 +1,8 @@
 // フェーズ E: 一言サマリー（吹き出し）生成（SPEC_EXPANSION §3.2 / §7.5, D-032）
 //
-// 当日の重要トピック（ボタン5グループ別の当日最重要記事1件ずつ。src/hooks/useArticles.ts と同じ選定。
-// lib/topTopics.ts）のタイトル + 要約を 1 コールで LLM に渡し、ホーム画面のロボット吹き出し用の
+// 当日の重要トピックは collect バッチが daily_topics へ確定保存したスナップショットを読む（D-038。
+// 画面 src/hooks/useArticles.ts・Slack 通知 notify.ts と必ず同じ記事集合になる）。
+// そのタイトル + 要約を 1 コールで LLM に渡し、ホーム画面のロボット吹き出し用の
 // 一言サマリーを生成して daily_summaries へ date（JST）で upsert する。
 //
 // 既存の LLMProvider 抽象化（llm/index.ts）は「1 記事 1 コール」の enrich() 用に設計されており、
@@ -11,21 +12,14 @@ import './env.js';
 import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from './lib/supabase.js';
-import { selectTopTopics, type TopTopicRow } from './lib/topTopics.js';
+import { getJstDateString } from './lib/jstDate.js';
+import { fetchSavedTopTopics, type TopTopicRow } from './lib/topTopics.js';
 
 // モデルは env で上書き可能（llm/gemini.ts と同じパターン。SPEC_EXPANSION §2）
 const MODEL_NAME = process.env.GEMINI_PRIMARY_MODEL ?? 'gemini-3.1-flash-lite';
 
-// 対象期間は D-023 のローリング24時間ウィンドウ（src/hooks/useArticles.ts / notify.ts と同じ定義）
-const TOPIC_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 // 記事0件の日 / LLM 失敗時のフォールバック文言（SPEC_EXPANSION §7.5 の例文をそのまま採用）
 const FALLBACK_SUMMARY = '今日はまだ情報を集めてるよ。';
-
-async function fetchTopTopics(): Promise<TopTopicRow[]> {
-  const windowStart = new Date(Date.now() - TOPIC_WINDOW_MS).toISOString();
-  return selectTopTopics(windowStart);
-}
 
 function buildPrompt(articles: TopTopicRow[]): string {
   const list = articles
@@ -55,15 +49,6 @@ async function generateSummary(articles: TopTopicRow[]): Promise<string> {
   return text;
 }
 
-// GitHub Actions の実行環境は UTC のため、JST (UTC+9) に変換してから日付部分を取り出す
-function getJstDateString(now = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const y = jst.getUTCFullYear();
-  const m = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(jst.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 async function upsertSummary(date: string, summaryJa: string): Promise<void> {
   const { error } = await supabase
     .from('daily_summaries')
@@ -88,7 +73,7 @@ export async function summarize(): Promise<void> {
 
   let topics: TopTopicRow[] = [];
   try {
-    topics = await fetchTopTopics();
+    topics = await fetchSavedTopTopics(date);
   } catch (err) {
     console.error('[summarize] fetch top topics failed:', err);
     await upsertSummaryFailSoft(date, FALLBACK_SUMMARY);
@@ -97,7 +82,7 @@ export async function summarize(): Promise<void> {
 
   if (topics.length === 0) {
     // 記事0件の日は LLM 呼び出し自体をスキップし、定型文をそのまま保存する（SPEC_EXPANSION §7.5）
-    console.log('[summarize] no articles in the last 24h, using fallback text');
+    console.log('[summarize] no topics in daily_topics snapshot, using fallback text');
     await upsertSummaryFailSoft(date, FALLBACK_SUMMARY);
     return;
   }

@@ -1,7 +1,8 @@
 // フェーズ F: Slack 通知（SPEC_EXPANSION §8）
 //
-// 当日の重要トピック（ボタン5グループ別の当日最重要記事1件ずつ。summarize.ts / src/hooks/useArticles.ts
-// と同じ選定。lib/topTopics.ts）と daily_summaries の当日行（summary_ja）を Slack Incoming Webhook へ
+// 当日の重要トピックは collect バッチが daily_topics へ確定保存したスナップショットを読む（D-038。
+// 画面 src/hooks/useArticles.ts・一言サマリー summarize.ts と必ず同じ記事集合になる）。
+// daily_summaries の当日行（summary_ja）と合わせて Slack Incoming Webhook へ
 // Block Kit 形式で 1 日 1 投稿する。LLM コールは行わない（既存の summary_ja を流用するのみ）。
 //
 // fail-soft（CLAUDE.md §4 / TASK_EXPANSION フェーズ F）:
@@ -10,10 +11,8 @@
 import './env.js';
 import { fileURLToPath } from 'url';
 import { supabase } from './lib/supabase.js';
-import { selectTopTopics, type TopTopicRow } from './lib/topTopics.js';
-
-// 対象期間は summarize.ts / src/hooks/useArticles.ts と同じローリング24時間ウィンドウ（D-023）
-const TOPIC_WINDOW_MS = 24 * 60 * 60 * 1000;
+import { getJstDateString } from './lib/jstDate.js';
+import { fetchSavedTopTopics, type TopTopicRow } from './lib/topTopics.js';
 
 // daily_summaries の当日行が無い場合のフォールバック文言。
 // フロント側 src/lib/dailySummary.ts の FALLBACK_SUMMARY と同一文言（SPEC_EXPANSION §7.5）
@@ -21,21 +20,6 @@ export const FALLBACK_SUMMARY = '今日はまだ情報を集めてるよ。';
 
 // 記事 0 件の日の本文。フロントの空状態と同じく「バグではなく今日は静かだった」と伝わる表現にする
 const EMPTY_DAY_TEXT = '今日はAI界隈が静かな一日だったみたい。また明日チェックしてね。';
-
-async function fetchTopTopics(): Promise<TopTopicRow[]> {
-  const windowStart = new Date(Date.now() - TOPIC_WINDOW_MS).toISOString();
-  return selectTopTopics(windowStart);
-}
-
-// GitHub Actions の実行環境は UTC のため、JST (UTC+9) に変換してから日付部分を取り出す
-// （summarize.ts の getJstDateString と同じロジック）
-function getJstDateString(now = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const y = jst.getUTCFullYear();
-  const m = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(jst.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 // daily_summaries の当日行を取得。行が無い・取得失敗時はフォールバック文言に倒す（fail-soft）
 async function fetchDailySummary(date: string): Promise<string> {
@@ -140,16 +124,17 @@ export async function notify(): Promise<void> {
     return;
   }
 
+  const date = getJstDateString();
+
   let topics: TopTopicRow[];
   try {
-    topics = await fetchTopTopics();
+    topics = await fetchSavedTopTopics(date);
   } catch (err) {
     // トピックが取れない状態で「記事 0 件」と誤解される投稿はしない。ログのみ残して終了する
     console.error('[notify] fetch top topics failed, skipping notification:', err);
     return;
   }
 
-  const date = getJstDateString();
   const summaryJa = await fetchDailySummary(date);
   const payload = buildSlackPayload(date, summaryJa, topics);
 

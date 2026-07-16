@@ -5,7 +5,12 @@ import { createLLMProvider } from './llm/index.js';
 import { normalizeUrl } from './lib/normalizeUrl.js';
 import { upsertArticle } from './lib/upsert.js';
 import { supabase } from './lib/supabase.js';
+import { getJstDateString } from './lib/jstDate.js';
+import { selectTopTopics, saveTopTopics } from './lib/topTopics.js';
 import type { RawArticle } from './types.js';
+
+// 重要トピックの選定ウィンドウ（直近24時間。D-023）
+const TOPIC_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 async function fetchExistingUrls(urls: string[]): Promise<Set<string>> {
   if (urls.length === 0) return new Set();
@@ -83,6 +88,18 @@ export async function collect(backfillDays = 1): Promise<void> {
   }
 
   console.log(`collect done: ok=${ok} ng=${ng}`);
+
+  // 重要トピックの選定はここ（enrich 完了直後）で 1 回だけ行い、daily_topics へスナップショット保存する。
+  // 画面・一言サマリー・Slack 通知が各自ウィンドウを再計算すると起点時刻がずれて内容が食い違うため、
+  // 起点時刻を 1 つに固定するのが狙い（D-038）。失敗しても収集結果自体は保存済みなので fail-soft。
+  try {
+    const windowStart = new Date(Date.now() - TOPIC_WINDOW_MS).toISOString();
+    const topics = await selectTopTopics(windowStart);
+    await saveTopTopics(getJstDateString(), topics);
+    console.log(`[collect] snapshotted ${topics.length} top topic(s) to daily_topics`);
+  } catch (err) {
+    console.error('[collect] top topics snapshot failed:', err);
+  }
 }
 
 // tsx で直接実行されたときのみ起動（import されたときは起動しない）
