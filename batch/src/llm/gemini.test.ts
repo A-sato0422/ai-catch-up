@@ -183,6 +183,44 @@ describe('GeminiProvider', () => {
     expect(result.difficulty).toBeUndefined();
   });
 
+  it('LLM が返した product を Enrichment に含める（取得元と異なる値も許容）', async () => {
+    // 取得元は zenn_gemini（product ヒント: gemini）だが内容は Claude 主体、という誤爆ケースを模す
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"Claude Sonnet 5 の記事","category":"update","importance_score":9,"product":"claude_code"}'
+    ));
+
+    const geminiTaggedArticle: RawArticle = { ...baseArticle, source: 'zenn_gemini', product: 'gemini' };
+    const result = await provider.enrich(geminiTaggedArticle);
+
+    expect(result.product).toBe('claude_code');
+  });
+
+  it('product が欠損・不正値の場合は undefined にする（呼び出し側でフォールバック）', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5}'
+    ));
+    const missing = await provider.enrich(baseArticle);
+    expect(missing.product).toBeUndefined();
+
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5,"product":"claude"}'
+    ));
+    const invalid = await provider.enrich(baseArticle);
+    expect(invalid.product).toBeUndefined();
+  });
+
+  it('取得元クエリ由来の product をヒントとしてプロンプトに含める', async () => {
+    mockGenerateContent.mockResolvedValue(makeResponse(
+      '{"summary_ja":"要約","category":"tips","importance_score":5}'
+    ));
+
+    await provider.enrich({ ...baseArticle, product: 'gemini' });
+
+    const [promptArg] = mockGenerateContent.mock.calls[0];
+    const promptText = typeof promptArg === 'string' ? promptArg : JSON.stringify(promptArg);
+    expect(promptText).toContain('"gemini"（収集元クエリ由来の推定値）');
+  });
+
   it('excerpt を 3000 文字に打ち切ってから LLM に渡す', async () => {
     mockGenerateContent.mockResolvedValue(makeResponse(
       '{"summary_ja":"要約","category":"tips","importance_score":5}'

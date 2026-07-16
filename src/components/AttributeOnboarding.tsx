@@ -49,7 +49,8 @@ export default function AttributeOnboarding({ onStart }: Props) {
           あなたに合わせてホーム画面をつくりましょう
         </h1>
         <p style={{ marginTop: 8, marginBottom: 24, color: 'var(--muted)', fontSize: 14, lineHeight: 1.7 }}>
-          気になる項目にチェックを入れてください（複数選択可）。あとから設定画面でいつでも変更できます。
+          気になる項目にチェックを入れてください（複数選択可）。チェックした項目に応じて、
+          ホーム画面に表示されるボタンが増えていきます。あとから設定画面でいつでも変更できます。
           重要トピック・お気に入りは常に表示されます。
         </p>
 
@@ -76,7 +77,14 @@ export default function AttributeOnboarding({ onStart }: Props) {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: 'var(--muted2)' }}>
           <CheckIcon size={15} strokeWidth={2.4} />
-          ホーム画面に {buttonCount} 個のボタンが表示されます（重要トピック・お気に入り含む）
+          <span>
+            ホーム画面に{' '}
+            {/* フェーズJ追加分: ボタン数はチェック操作の結果が一目で分かるようアクセントカラーで強調する */}
+            <strong style={{ color: 'var(--imp-text)', fontSize: 17, fontWeight: 900 }}>
+              {buttonCount} 個
+            </strong>
+            {' '}のボタンが表示されます（重要トピック・お気に入り含む）
+          </span>
         </span>
         <button
           onClick={() => onStart(selection)}

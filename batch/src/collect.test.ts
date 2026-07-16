@@ -151,6 +151,34 @@ describe('collect', () => {
     expect(mockUpsertArticle).toHaveBeenCalledTimes(1);
   });
 
+  it('LLM が判定した product が取得経路由来の値を上書きして upsert される', async () => {
+    // zenn_gemini 経由（product: gemini）で取れた Claude 記事、という誤爆ケース
+    mockSource1.fetch.mockResolvedValue([
+      { ...makeArticle('https://example.com/claude-article'), product: 'gemini' },
+    ]);
+    mockSource2.fetch.mockResolvedValue([]);
+    mockEnrich.mockResolvedValue({ ...defaultEnrichment, product: 'claude_code' as const });
+
+    await collect();
+
+    const [[upserted]] = mockUpsertArticle.mock.calls;
+    expect(upserted.product).toBe('claude_code');
+  });
+
+  it('LLM の product が欠損（undefined）の場合は取得経路由来の product を維持する', async () => {
+    mockSource1.fetch.mockResolvedValue([
+      { ...makeArticle('https://example.com/no-product'), product: 'gemini' },
+    ]);
+    mockSource2.fetch.mockResolvedValue([]);
+    // キー自体は存在して値が undefined、というスプレッド事故が起きやすい形で検証する
+    mockEnrich.mockResolvedValue({ ...defaultEnrichment, product: undefined });
+
+    await collect();
+
+    const [[upserted]] = mockUpsertArticle.mock.calls;
+    expect(upserted.product).toBe('gemini');
+  });
+
   it('URL に utm パラメータが含まれている場合は正規化してから重複チェックする', async () => {
     mockSource1.fetch.mockResolvedValue([
       makeArticle('https://example.com/a?utm_source=feed'),

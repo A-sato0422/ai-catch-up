@@ -67,7 +67,13 @@ export async function collect(backfillDays = 1): Promise<void> {
   for (const article of newArticles) {
     try {
       const enrichment = await llm.enrich(article);
-      await upsertArticle({ ...article, ...enrichment, llmProvider: llmProviderName });
+      // product は LLM の内容判定を優先（D-037）。取得クエリ由来の値はタグ付けが著者任せで誤爆しうるため
+      // ヒント扱いとし、LLM 出力の欠損・不正時のみフォールバックする
+      const product = enrichment.product ?? article.product;
+      if (product !== article.product) {
+        console.log(`[collect] product reclassified: ${article.product} -> ${product} (${article.url})`);
+      }
+      await upsertArticle({ ...article, ...enrichment, product, llmProvider: llmProviderName });
       ok++;
     } catch (err) {
       // 1 記事の失敗で全体を止めない（fail-soft）

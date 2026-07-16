@@ -19,6 +19,10 @@ export interface Enrichment {
   summaryJa: string;
   category: Category;
   importanceScore: number; // 1〜10
+  // 記事内容に基づく product 判定（D-037）。取得クエリ由来の product はタグ付け・検索ヒットが
+  // 著者任せのため誤爆しうる（例: Claude 記事に Gemini タグ）。LLM が内容から判定した値を優先し、
+  // 欠損・不正時は RawArticle.product（取得経路由来）にフォールバックする
+  product?: Product;
   // 拡張フィールド（SPEC_EXPANSION §3.1 / §4.1）。LLM 出力で欠損しうる前提のため任意
   // かつ DB では null 許容（CLAUDE.md §4: 欠損時は null で保存し、既存記事のバックフィルはしない）
   importanceReason?: string; // 重要な理由の短文（10〜15 字。例「破壊的変更」）

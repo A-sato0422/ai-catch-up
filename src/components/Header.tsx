@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import lottie from 'lottie-web';
 import { useTheme } from '../context/ThemeContext';
 import RobotSaludando from '../assets/lottie/RobotSaludando.json';
@@ -80,6 +80,9 @@ function MoonIcon({ filled }: { filled: boolean }) {
 export default function Header() {
   const navigate = useNavigate();
   const { dark, toggleDark } = useTheme();
+  // フェーズJ追加分: 設定画面表示中はヘッダーの設定ボタンを非活性にする（現在地への遷移ボタンは無意味なため）
+  const { pathname } = useLocation();
+  const onSettings = pathname === '/settings';
 
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric',
@@ -141,6 +144,7 @@ export default function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <button
           onClick={() => navigate('/settings')}
+          disabled={onSettings}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -150,10 +154,12 @@ export default function Header() {
             borderRadius: 10,
             border: '1.5px solid var(--pill-line)',
             background: 'var(--pill-bg)',
-            cursor: 'pointer',
+            cursor: onSettings ? 'default' : 'pointer',
             color: 'var(--muted2)',
+            // 非活性時は視覚的にも薄くする（ダークモードでも変数ベースの色に opacity を掛けるだけなので破綻しない）
+            opacity: onSettings ? 0.4 : 1,
             flexShrink: 0,
-            transition: 'background 0.15s',
+            transition: 'background 0.15s, opacity 0.15s',
           }}
           aria-label="表示するボタンの設定"
         >

@@ -91,6 +91,7 @@ interface Enrichment {
   summaryJa: string;            // 日本語 3 行要約
   category: Category;
   importanceScore: number;      // 1〜10
+  product?: Product;            // 記事内容に基づく product 判定（D-037）。取得クエリ由来の値より優先し、欠損時は取得経路由来へフォールバック
   importanceReason: string;     // 重要な理由の短文（10〜15 字。例「破壊的変更」）
   tags: string[];               // トピックタグ 2〜3 個
   audience: Audience;
