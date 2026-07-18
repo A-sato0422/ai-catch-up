@@ -178,25 +178,8 @@ export default function SettingsPage() {
           style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}
         >
           <span style={{ color: 'var(--muted)', fontSize: 14.5 }}>
-            重要トピック・お気に入りは常に表示されます
+            「重要トピック」ボタン「お気に入り」ボタンは常に表示されます
           </span>
-          <button
-            onClick={() => setShowAttributePopup(true)}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              color: '#ff5a2c',
-              fontSize: 13.5,
-              fontWeight: 700,
-              fontFamily: 'inherit',
-              padding: 0,
-              textDecoration: 'underline',
-              textUnderlineOffset: 3,
-            }}
-          >
-            属性から選び直す
-          </button>
         </div>
       </div>
 
@@ -220,7 +203,7 @@ export default function SettingsPage() {
           }}
         >
           <CheckIcon size={15} strokeWidth={2.4} />
-          {count} 個選択中
+          {count} 個のボタンを追加
         </span>
 
         <button
@@ -255,6 +238,23 @@ export default function SettingsPage() {
         >
           すべて解除
         </button>
+        <button
+            onClick={() => setShowAttributePopup(true)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: '#ff5a2c',
+              fontSize: 13.5,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              padding: 0,
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+            }}
+          >
+            属性から選び直す
+          </button>
       </div>
 
       {/* groups */}
