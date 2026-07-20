@@ -14,7 +14,9 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 新規最大約260件を4秒間隔（15 RPM枠）で逐次 enrich すると下限17分＋Gemini
+    # の実レイテンシで30分に拮抗し、混雑日にタイムアウトで落ちるため45分に引き上げ。
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
