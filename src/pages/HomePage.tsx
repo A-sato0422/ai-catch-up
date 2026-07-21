@@ -11,54 +11,6 @@ import { fetchDailySummary, FALLBACK_SUMMARY } from '../lib/dailySummary';
 const BUBBLE_APPEAR_MS = 1100;
 const CHAR_INTERVAL_MS = 55;
 
-/*
- * krobo ロゴの上下運動を「ロボット本体と同じ時計」で駆動するための定義（フェーズJ改）。
- * 以前は CSS keyframes（roboBob）で別クロック駆動していたため、特定環境で本体とロゴの位相がずれた。
- * ここでは RobotSaludando.json の胴体レイヤー（"Layer 1"）の position キーフレームをそのまま区間化し、
- * lottie の currentFrame から同一オフセットを毎フレーム算出して span に直接当てる。
- * これにより両者の時計は lottie 1 つに統一され、原理的にずれない（自己修復ロジックも不要になる）。
- *
- * 各区間 = [開始フレーム, 終了フレーム, 開始オフセット, 終了オフセット, cubic-bezier(x1,y1,x2,y2)]。
- * オフセットはキャンバス(800px)内の y 変位（負 = 上）で、値と ease は元 CSS（src/index.css の roboBob）と同一。
- * 191 フレーム以降は保持区間のためオフセット 0。
- */
-const BOB_SEGMENTS: [number, number, number, number, [number, number, number, number]][] = [
-  [0, 22, 0, -7, [0.333, 0, 0.667, 1]],
-  [22, 50, -7, 0, [0.333, 0, 0.667, 1]],
-  [50, 85, 0, -14, [0.333, 0, 0.667, 1]],
-  [85, 119, -14, 0, [0.333, 0, 0.667, 1]],
-  [119, 157, 0, -14, [0.167, 0, 0.667, 1]],
-  [157, 191, -14, 0, [0.333, 0, 0.667, 1]],
-];
-
-// cubic-bezier(x1,y1,x2,y2) の easing を x(区間内の進捗) から y(補間係数) へ解く（CSS と同じ定義）。
-// P0=(0,0), P3=(1,1) 固定。x に対応する媒介変数 t を二分法で求めてから y を返す。
-function cubicBezierEase(x: number, x1: number, y1: number, x2: number, y2: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  const cx = (t: number) => (1 - t) ** 2 * 3 * t * x1 + (1 - t) * 3 * t * t * x2 + t ** 3;
-  const cy = (t: number) => (1 - t) ** 2 * 3 * t * y1 + (1 - t) * 3 * t * t * y2 + t ** 3;
-  let lo = 0, hi = 1, t = x;
-  for (let i = 0; i < 20; i++) {
-    t = (lo + hi) / 2;
-    const xt = cx(t);
-    if (Math.abs(xt - x) < 1e-4) break;
-    if (xt < x) lo = t; else hi = t;
-  }
-  return cy(t);
-}
-
-// lottie の currentFrame → キャンバス(800px)内の y オフセット(px)
-function bobOffset(frame: number): number {
-  for (const [f0, f1, o0, o1, bez] of BOB_SEGMENTS) {
-    if (frame >= f0 && frame < f1) {
-      const p = cubicBezierEase((frame - f0) / (f1 - f0), bez[0], bez[1], bez[2], bez[3]);
-      return o0 + (o1 - o0) * p;
-    }
-  }
-  return 0;
-}
-
 // ボタン出現アニメーションの基準ディレイ・刻み幅（ボタン数が可変になったため index から算出する）
 const NAV_ANIM_BASE_DELAY = 0.55;
 const NAV_ANIM_STEP = 0.1;
@@ -158,8 +110,6 @@ function NavCircle({
 export default function HomePage() {
   const navigate = useNavigate();
   const robotRef = useRef<HTMLDivElement>(null);
-  // 開始位相の同期用: krobo の span を lottie の enterFrame ハンドラから参照する
-  const kroboRef = useRef<HTMLSpanElement>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [showCursor, setShowCursor] = useState(false);
   // ホームのボタン配列は設定（localStorage）から動的生成する（固定枠2 + 自由枠最大5。G-1）
@@ -178,18 +128,8 @@ export default function HomePage() {
       autoplay: true,
       animationData: RobotSaludando,
     });
-    // krobo ロゴを本体と同じ時計（lottie の currentFrame）で毎フレーム動かす。
-    // 胴体レイヤーのキーフレームから算出した同一オフセットを span の transform に直接当てるため、
-    // 本体とロゴは常に同一フレームの値で更新され、環境によらず位相がずれない。
-    const onFrame = () => {
-      const span = kroboRef.current;
-      const box = span?.parentElement; // 幅 = --robot-w
-      if (!span || !box) return;
-      // キャンバス(800px)内オフセットを描画幅に比例換算して px 変位にする
-      const y = (bobOffset(anim.currentFrame) / 800) * box.getBoundingClientRect().width;
-      span.style.transform = `translate(-50%, -50%) translateY(${y}px)`;
-    };
-    anim.addEventListener('enterFrame', onFrame);
+    // krobo ロゴは Lottie アニメーション内の画像レイヤー（RobotSaludando.json の "krobo" レイヤー）
+    // として埋め込み済みのため、本体と同じ再生クロックで動く。DOM 側での同期処理は不要。
     return () => anim.destroy();
   }, []);
 
@@ -251,45 +191,17 @@ export default function HomePage() {
         }}
       >
         {/*
-          Robot Lottie animation + 「krobo」ロゴのオーバーレイ（フェーズJ改）。
-          lottie-web が robotRef の innerHTML を完全に管理するため、ロゴを直接 DOM に挿し込むことはできない。
-          代わりに relative コンテナで robotRef に重ね、pointer-events: none の absolute な文字要素として置く。
-          上下運動は CSS keyframes ではなく lottie の currentFrame から算出（bobOffset）して transform を
-          毎フレーム直接更新する。本体と同じ時計になるため位相ずれが起きない（上の useEffect / onFrame 参照）。
+          Robot Lottie animation（方式A）。「krobo」ロゴは RobotSaludando.json に画像レイヤーとして
+          埋め込み済みのため、本体と同じ再生クロックで動く。DOM 側のオーバーレイ・同期処理は不要。
         */}
         <div
           style={{
-            position: 'relative',
-            // このコンテナ幅が krobo の bob 振幅の基準（onFrame が getBoundingClientRect で読む）になる
             width: 'clamp(160px, 24vw, 260px)',
             flexShrink: 0,
             animation: 'fadeInUp 0.45s ease 0.25s both',
           }}
         >
           <div ref={robotRef} style={{ width: '100%' }} />
-          <span
-            ref={kroboRef}
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '58%',
-              // 初期値（フレーム0 = オフセット0）。以降は onFrame が transform を毎フレーム上書きする。
-              transform: 'translate(-50%, -50%)',
-              fontFamily: "'Noto Sans JP', -apple-system, sans-serif",
-              fontWeight: 800,
-              fontSize: 'clamp(11px, 1.7vw, 15px)',
-              letterSpacing: '0.14em',
-              color: 'rgba(255, 255, 255, 0.6)',
-              textShadow: '0 1px 0 rgba(255,255,255,0.3), 0 -1px 1px rgba(0,0,0,0.5)',
-              mixBlendMode: 'overlay',
-              pointerEvents: 'none',
-              userSelect: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            krobo
-          </span>
         </div>
 
         {/* Speech bubble — appears last */}
