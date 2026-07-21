@@ -72,44 +72,5 @@
   50%       { opacity: 0; }
 }
 
-/*
- * フェーズJ: ホーム画面ロボットの胴体に重ねる「krobo」ロゴの上下運動。
- * RobotSaludando.json の胴体（"Layer 1"）の position キーフレームをそのまま写経した値。
- * 実際の動きは単一のサイン波ではなく「小バウンド(7px) → 大バウンド(14px) ×2」の変則3拍で、
- * 30fps・194フレーム = 6.46667 秒/ループ。% はフレーム番号/194、translateY は
- * キャンバス(800px)内のオフセットを描画幅 --robot-w に比例換算した値（-7/800, -14/800）。
- * イージングも Lottie 側の (0.333,0)-(0.667,1)（61.34% のみ (0.167,0)-(0.667,1)）に合わせる。
- * translate(-50%, -50%) は要素自身の中心を基準位置に固定するためのオフセットで、bob 幅はここに乗せる。
- */
-@keyframes roboBob {
-  0% {
-    transform: translate(-50%, -50%) translateY(0);
-    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 1);
-  }
-  11.34% {
-    transform: translate(-50%, -50%) translateY(calc(var(--robot-w) * -0.00875));
-    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 1);
-  }
-  25.77% {
-    transform: translate(-50%, -50%) translateY(0);
-    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 1);
-  }
-  43.81% {
-    transform: translate(-50%, -50%) translateY(calc(var(--robot-w) * -0.0175));
-    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 1);
-  }
-  61.34% {
-    transform: translate(-50%, -50%) translateY(0);
-    animation-timing-function: cubic-bezier(0.167, 0, 0.667, 1);
-  }
-  80.93% {
-    transform: translate(-50%, -50%) translateY(calc(var(--robot-w) * -0.0175));
-    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 1);
-  }
-  98.45%, 100% {
-    transform: translate(-50%, -50%) translateY(0);
-  }
-}
-
 * { box-sizing: border-box; }
 body { margin: 0; }
